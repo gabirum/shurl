@@ -1,0 +1,18 @@
+import z from 'zod'
+
+const envSchema = z.object({
+  LOG_LEVEL: z.enum(['silent', 'error', 'warn', 'info', 'debug', 'trace']),
+  JWKS_URI: z.url({ protocol: /^https?$/ }),
+  JWK_ISSUER: z.url({ protocol: /^https?$/ }),
+  AUDIENCE: z.string(),
+  METRICS_TOKEN: z.string(),
+})
+
+const { data: env, error } = envSchema.safeParse(Bun.env)
+if (error) {
+  console.error('Invalid env')
+  console.error(z.treeifyError(error))
+  process.exit(1)
+}
+
+export default env!

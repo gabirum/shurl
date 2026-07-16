@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /app/src
+          initial_sync: true
+        - action: rebuild
+          path: package.json
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=mysql://shurl:shurl@database:3306/shurl
+    env_file:
+      - .env
+    ports:
+      - 3000:3000
+
+  database:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=shurl
+      - MYSQL_USER=shurl
+      - MYSQL_PASSWORD=shurl
+    ports:
+      - 3306:3306
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  db:

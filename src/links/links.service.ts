@@ -1,3 +1,4 @@
+import { getCachedLink, invalidateLink, setCachedLink } from './links.cache'
 import { recordHit } from './links.counter'
 import type { LinkRow } from './links.repository'
 import * as repo from './links.repository'
@@ -36,7 +37,9 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
   if (input.code) {
     await repo.insertLink({ ...newLink, code: input.code })
     logger.info({ owner, code: input.code, redirectStatus: input.redirectStatus }, 'link created')
-    return (await repo.findByCode(input.code))!
+    const row = (await repo.findByCode(input.code))!
+    await setCachedLink(input.code, row)
+    return row
   }
 
   for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
@@ -44,7 +47,9 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
     try {
       await repo.insertLink({ ...newLink, code })
       logger.info({ owner, code, redirectStatus: input.redirectStatus }, 'link created')
-      return (await repo.findByCode(code))!
+      const row = (await repo.findByCode(code))!
+      await setCachedLink(code, row)
+      return row
     } catch (error) {
       if (error instanceof repo.CodeConflictException) continue
       throw error
@@ -77,18 +82,29 @@ export async function update(owner: string, code: string, patch: UpdateLinkInput
   if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
   await repo.updateLink(code, { url: patch.url, redirectStatus: patch.redirectStatus })
   logger.info({ owner, code, patch }, 'link updated')
-  return getOwned(owner, code)
+  const updated = await getOwned(owner, code)
+  await setCachedLink(code, updated)
+  return updated
 }
 
 export async function remove(owner: string, code: string): Promise<void> {
   const row = await getOwned(owner, code)
   if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
   await repo.removeLink(code)
+  await invalidateLink(code)
   logger.info({ owner, code }, 'link removed')
 }
 
 export async function resolve(code: string): Promise<LinkRow | undefined> {
+  const cached = await getCachedLink(code)
+  if (cached !== undefined) {
+    if (cached) recordHit(code)
+    logger.debug({ code, cacheHit: true }, 'link resolved')
+    return cached ?? undefined
+  }
+
   const row = await repo.findByCode(code)
+  await setCachedLink(code, row ?? null)
   if (!row) return undefined
   recordHit(code)
   logger.debug({ code }, 'link resolved')

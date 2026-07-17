@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`shurl` is a URL shortener service with a package-by-feature architecture (see `src/links/`). Persistence uses **`Bun.sql` directly (MySQL) — no ORM**; vendor lock-in to Bun/MySQL is an accepted tradeoff. Prefer Bun/Web-standard built-ins (`Bun.sql`, `Glob`, `crypto.getRandomValues`, `setInterval`) over adding new dependencies.
+`shurl` is a URL shortener service with a package-by-feature architecture (see `src/links/`). Persistence uses **`Bun.sql` directly (MySQL) — no ORM**; vendor lock-in to Bun/MySQL/Redis is an accepted tradeoff. Prefer Bun/Web-standard built-ins (`Bun.sql`, `Bun.redis`, `Glob`, `crypto.getRandomValues`, `setInterval`) over adding new dependencies.
 
 ## Commands
 
@@ -19,7 +19,7 @@ There is no test suite or build script defined yet.
 
 ### Docker
 
-- `docker-compose.yaml` runs the app (via `Dockerfile.dev`) alongside a MySQL database, with a file-watch sync of `./src`.
+- `docker-compose.yaml` runs the app (via `Dockerfile.dev`) alongside a MySQL database and a Redis instance, with a file-watch sync of `./src`.
 - `Dockerfile` is the production image: installs with `--production`, copies `src`, runs as the `bun` user, entrypoint `bun run index.ts`.
 - `Dockerfile.dev` installs full deps and runs `bun dev` as the `bun` user.
 
@@ -39,11 +39,12 @@ There is no test suite or build script defined yet.
   - `links.repository.ts` — the only module that touches `sql` for the `links` table (raw parameterized queries, no query builder). Duplicate-code inserts are detected via `SQL.MySQLError` with **`errno === 1062`** (Bun's MySQL adapter reports `error.code` as the generic `ERR_MYSQL_SERVER_ERROR`, not a MySQL-specific string like `ER_DUP_ENTRY` — the real MySQL error number is in `.errno`) and raised as `CodeConflictException`.
   - `links.service.ts` — business rules: short-code generation (random base62, retried on collision) or user-supplied alias, per-owner scoping (a link's `owner` is the JWT `sub`; access by a non-owner is treated as 404 via `LinkNotFoundException`, not 403, to avoid leaking existence), and **308 immutability** (update/delete on a `redirect_status = 308` row throws `LinkImmutableException` → HTTP 409).
   - `links.counter.ts` — the eventually-consistent access counter: hits accumulate in an in-memory `Map` (`recordHit`) and are flushed to MySQL every 5s (`setInterval`, unref'd) via a batched transaction; a failed flush puts the counts back for the next attempt.
+  - `links.cache.ts` — two-tier cache for `resolve()`, the public redirect hot path: an in-process LRU (`Map`, capacity/TTL-bound, `L1_MAX_ENTRIES`/`L1_TTL_MS`) backed by a shared Redis tier (`Bun.redis`, the global singleton client, `L2_TTL_SECONDS`) so cache writes are visible across horizontally-scaled instances without waiting on L1 to expire. Caches both hits (`LinkRow`) and confirmed misses (`null`, to absorb code-guessing traffic) keyed by short code. `create`/`update` populate the cache with the fresh row; `remove` invalidates it. Redis errors on read/write/invalidate are caught and logged (`logger.warn`) rather than thrown — the cache is best-effort and callers fall back to `links.repository.ts`.
   - `links.routes.ts` — two Hono routers: `managedLinks` (CRUD, mounted at `/auth/links`, already covered by the global JWK middleware) and `publicLinks` (`GET /:code` → `c.redirect(url, status)`, mounted at `/c`).
 
 ## Environment variables
 
-Defined in `.env.example` / validated in `src/env.ts`: `LOG_LEVEL`, `JWKS_URI`, `JWK_ISSUER`, `AUDIENCE`, `DATABASE_URL` (must be a `mysql://` URL — used to construct the `Bun.sql` client in `src/db.ts`). `/metrics` is no longer gated by a token env var — it's IP-restricted instead (see Architecture above).
+Defined in `.env.example` / validated in `src/env.ts`: `LOG_LEVEL`, `JWKS_URI`, `JWK_ISSUER`, `AUDIENCE`, `DATABASE_URL` (must be a `mysql://` URL — used to construct the `Bun.sql` client in `src/db.ts`), `REDIS_URL` (`redis://`/`rediss://`/`valkey://` — read directly by the global `Bun.redis` client used in `links.cache.ts`, not passed through explicitly). `/metrics` is no longer gated by a token env var — it's IP-restricted instead (see Architecture above).
 
 ## Hono documentation
 

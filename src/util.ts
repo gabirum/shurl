@@ -1,3 +1,5 @@
+import { ContentfulStatusCode } from 'hono/utils/http-status'
+
 export interface Slice<T> {
   data: T[]
   isFirst: boolean
@@ -52,5 +54,16 @@ export function createPage<T>(data: T[], requestedSize: number, requestedPage: n
     hasPrevious: requestedPage > 1,
     totalPages,
     totalElements,
+  }
+}
+
+export class Exception extends Error {
+  constructor(
+    public readonly code: string = 'E_INTERNAL',
+    message: string = 'internal server error',
+    public readonly suggestedStatus: ContentfulStatusCode = 500,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
   }
 }

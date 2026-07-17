@@ -4,11 +4,19 @@ import * as repo from './links.repository'
 import type { CreateLinkInput, PaginationInput, UpdateLinkInput } from './links.schema'
 import { PERMANENT_REDIRECT_STATUS } from './links.schema'
 import type { Page } from '../util'
-import { createPage } from '../util'
+import { createPage, Exception } from '../util'
 import { logger } from '../logger'
 
-export class LinkNotFoundError extends Error {}
-export class LinkImmutableError extends Error {}
+export class LinkNotFoundException extends Exception {
+  constructor() {
+    super('E_NOT_FOUND', 'link not found', 404)
+  }
+}
+export class LinkImmutableException extends Exception {
+  constructor() {
+    super('E_LINK_IMMUTABLE', 'permanent links cannot be modified', 409)
+  }
+}
 
 const CODE_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 const CODE_LENGTH = 7
@@ -38,7 +46,7 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
       logger.info({ owner, code, redirectStatus: input.redirectStatus }, 'link created')
       return (await repo.findByCode(code))!
     } catch (error) {
-      if (error instanceof repo.CodeConflictError) continue
+      if (error instanceof repo.CodeConflictException) continue
       throw error
     }
   }
@@ -47,7 +55,7 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
 
 async function getOwned(owner: string, code: string): Promise<LinkRow> {
   const row = await repo.findByCode(code)
-  if (!row || row.owner !== owner) throw new LinkNotFoundError(code)
+  if (!row || row.owner !== owner) throw new LinkNotFoundException()
   return row
 }
 
@@ -66,7 +74,7 @@ export async function list(owner: string, pagination: PaginationInput): Promise<
 
 export async function update(owner: string, code: string, patch: UpdateLinkInput): Promise<LinkRow> {
   const row = await getOwned(owner, code)
-  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableError(code)
+  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
   await repo.updateLink(code, { url: patch.url, redirectStatus: patch.redirectStatus })
   logger.info({ owner, code, patch }, 'link updated')
   return getOwned(owner, code)
@@ -74,7 +82,7 @@ export async function update(owner: string, code: string, patch: UpdateLinkInput
 
 export async function remove(owner: string, code: string): Promise<void> {
   const row = await getOwned(owner, code)
-  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableError(code)
+  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
   await repo.removeLink(code)
   logger.info({ owner, code }, 'link removed')
 }

@@ -1,4 +1,5 @@
 import { sql, SQL } from 'bun'
+import { Exception } from '../util'
 
 export interface LinkRow {
   code: string
@@ -10,7 +11,11 @@ export interface LinkRow {
   updated_at: Date
 }
 
-export class CodeConflictError extends Error {}
+export class CodeConflictException extends Exception {
+  constructor() {
+    super('E_CODE_CONFLICT', 'code already in use', 409)
+  }
+}
 
 export interface NewLink {
   code: string
@@ -27,7 +32,7 @@ export async function insertLink(link: NewLink): Promise<void> {
     `
   } catch (error) {
     if (error instanceof SQL.MySQLError && error.errno === 1062) {
-      throw new CodeConflictError(link.code)
+      throw new CodeConflictException()
     }
     throw error
   }

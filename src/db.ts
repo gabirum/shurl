@@ -11,7 +11,7 @@ export async function migrate() {
     )
   `
 
-  const files = [...new Glob('*.sql').scanSync({ cwd: migrationsDir })].sort()
+  const files = Array.from(new Glob('*.sql').scanSync({ cwd: migrationsDir })).sort()
   await sql.begin(async tx => {
     for (const name of files) {
       const [applied] = await tx`SELECT 1 FROM schema_migrations WHERE name = ${name}`

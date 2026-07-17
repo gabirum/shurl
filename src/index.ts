@@ -1,8 +1,9 @@
 import { prometheus } from '@hono/prometheus'
 import { Hono } from 'hono'
-import { bearerAuth } from 'hono/bearer-auth'
+import { getConnInfo } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { ipRestriction } from 'hono/ip-restriction'
 import { jwk } from 'hono/jwk'
 import type { JwtVariables } from 'hono/jwt'
 import { poweredBy } from 'hono/powered-by'
@@ -11,10 +12,9 @@ import { requestId, RequestIdVariables } from 'hono/request-id'
 import { secureHeaders } from 'hono/secure-headers'
 import { migrate } from './db'
 import env from './env'
-import { CodeConflictError } from './links/links.repository'
 import { managedLinks, publicLinks } from './links/links.routes'
-import { LinkImmutableError, LinkNotFoundError } from './links/links.service'
 import { logger } from './logger'
+import { Exception } from './util'
 
 process.on('uncaughtException', error => {
   logger.fatal({ err: error }, 'uncaught exception, terminating')
@@ -27,7 +27,7 @@ process.on('unhandledRejection', reason => {
 })
 
 const app = new Hono<{ Variables: RequestIdVariables & JwtVariables }>()
-const { printMetrics, registerMetrics } = prometheus()
+const { printMetrics, registerMetrics } = prometheus({ collectDefaultMetrics: true })
 
 app.use(requestId())
 app.use(async (c, next) => {
@@ -55,19 +55,23 @@ app.use(
   jwk({ alg: ['RS256'], jwks_uri: env.JWKS_URI, verification: { aud: env.AUDIENCE, iss: env.JWK_ISSUER } }),
 )
 
-app.get('/metrics', bearerAuth({ token: env.METRICS_TOKEN }), printMetrics)
+app.get(
+  '/metrics',
+  ipRestriction(getConnInfo, {
+    allowList: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/8', 'fc00::/7'],
+  }),
+  printMetrics,
+)
 
 app.route('/auth/links', managedLinks)
 app.route('/c', publicLinks)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) return err.getResponse()
-  if (err instanceof LinkNotFoundError) return c.json({ message: 'link not found' }, 404)
-  if (err instanceof LinkImmutableError) return c.json({ message: 'permanent links cannot be modified' }, 409)
-  if (err instanceof CodeConflictError) return c.json({ message: 'code already in use' }, 409)
+  if (err instanceof Exception) return c.json({ code: err.code, message: err.message }, err.suggestedStatus)
 
   logger.error({ err, requestId: c.get('requestId') }, 'unhandled error')
-  return c.json({ message: 'internal server error' }, 500)
+  return c.json({ code: 'E_INTERNAL', message: 'internal server error' }, 500)
 })
 
 try {

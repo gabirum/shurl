@@ -1,12 +1,24 @@
-import { zValidator } from '@hono/zod-validator'
-import { Hono, type Context } from 'hono'
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
+import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
 import type { LinkRow } from './links.repository'
-import { codeSchema, createLinkSchema, paginationSchema, updateLinkSchema } from './links.schema'
+import {
+  codeParamSchema,
+  codeSchema,
+  createLinkSchema,
+  errorSchema,
+  linkPageSchema,
+  linkSchema,
+  paginationSchema,
+  updateLinkSchema,
+} from './links.schema'
 import * as linksService from './links.service'
 
 type Env = { Variables: JwtVariables }
+
+const tags = ['Links']
+const security = [{ Bearer: [] }]
 
 function ownerOf(c: Context<Env>): string {
   const payload = c.get('jwtPayload') as { sub?: unknown }
@@ -27,49 +39,145 @@ function toDto(link: LinkRow) {
   }
 }
 
-export const managedLinks = new Hono<Env>()
+export const managedLinks = new OpenAPIHono<Env>()
 
-managedLinks.post('/', zValidator('json', createLinkSchema), async c => {
-  const owner = ownerOf(c)
-  const input = c.req.valid('json')
-  const link = await linksService.create(owner, input)
-  return c.json(toDto(link), 201)
-})
+managedLinks.openapi(
+  createRoute({
+    method: 'post',
+    path: '/',
+    tags,
+    security,
+    summary: 'Create a link',
+    request: { body: { required: true, content: { 'application/json': { schema: createLinkSchema } } } },
+    responses: {
+      201: { content: { 'application/json': { schema: linkSchema } }, description: 'link created' },
+      409: { content: { 'application/json': { schema: errorSchema } }, description: 'code already in use' },
+    },
+  }),
+  async c => {
+    const owner = ownerOf(c)
+    const input = c.req.valid('json')
+    const link = await linksService.create(owner, input)
+    return c.json(toDto(link), 201)
+  },
+)
 
-managedLinks.get('/', zValidator('query', paginationSchema), async c => {
-  const owner = ownerOf(c)
-  const pagination = c.req.valid('query')
-  const slice = await linksService.list(owner, pagination)
-  return c.json({ ...slice, data: slice.data.map(toDto) })
-})
+managedLinks.openapi(
+  createRoute({
+    method: 'get',
+    path: '/',
+    tags,
+    security,
+    summary: 'List the caller’s links',
+    request: { query: paginationSchema },
+    responses: {
+      200: { content: { 'application/json': { schema: linkPageSchema } }, description: 'paginated list of links' },
+    },
+  }),
+  async c => {
+    const owner = ownerOf(c)
+    const pagination = c.req.valid('query')
+    const slice = await linksService.list(owner, pagination)
+    return c.json({ ...slice, data: slice.data.map(toDto) })
+  },
+)
 
-managedLinks.get('/:code', async c => {
-  const owner = ownerOf(c)
-  const link = await linksService.get(owner, c.req.param('code'))
-  return c.json(toDto(link))
-})
+managedLinks.openapi(
+  createRoute({
+    method: 'get',
+    path: '/{code}',
+    tags,
+    security,
+    summary: 'Get a link by code',
+    request: { params: codeParamSchema },
+    responses: {
+      200: { content: { 'application/json': { schema: linkSchema } }, description: 'the link' },
+      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+    },
+  }),
+  async c => {
+    const owner = ownerOf(c)
+    const { code } = c.req.valid('param')
+    const link = await linksService.get(owner, code)
+    return c.json(toDto(link), 200)
+  },
+)
 
-managedLinks.patch('/:code', zValidator('json', updateLinkSchema), async c => {
-  const owner = ownerOf(c)
-  const patch = c.req.valid('json')
-  const link = await linksService.update(owner, c.req.param('code'), patch)
-  return c.json(toDto(link))
-})
+managedLinks.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/{code}',
+    tags,
+    security,
+    summary: 'Update a link',
+    request: {
+      params: codeParamSchema,
+      body: { required: true, content: { 'application/json': { schema: updateLinkSchema } } },
+    },
+    responses: {
+      200: { content: { 'application/json': { schema: linkSchema } }, description: 'link updated' },
+      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+      409: {
+        content: { 'application/json': { schema: errorSchema } },
+        description: 'permanent links cannot be modified',
+      },
+    },
+  }),
+  async c => {
+    const owner = ownerOf(c)
+    const { code } = c.req.valid('param')
+    const patch = c.req.valid('json')
+    const link = await linksService.update(owner, code, patch)
+    return c.json(toDto(link), 200)
+  },
+)
 
-managedLinks.delete('/:code', async c => {
-  const owner = ownerOf(c)
-  await linksService.remove(owner, c.req.param('code'))
-  return c.body(null, 204)
-})
+managedLinks.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/{code}',
+    tags,
+    security,
+    summary: 'Delete a link',
+    request: { params: codeParamSchema },
+    responses: {
+      204: { description: 'link removed' },
+      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+      409: {
+        content: { 'application/json': { schema: errorSchema } },
+        description: 'permanent links cannot be modified',
+      },
+    },
+  }),
+  async c => {
+    const owner = ownerOf(c)
+    const { code } = c.req.valid('param')
+    await linksService.remove(owner, code)
+    return c.body(null, 204)
+  },
+)
 
-export const publicLinks = new Hono()
+export const publicLinks = new OpenAPIHono()
 
-publicLinks.get('/:code', async c => {
-  const code = c.req.param('code')
-  if (!codeSchema.safeParse(code).success) return c.notFound()
+publicLinks.openapi(
+  createRoute({
+    method: 'get',
+    path: '/{code}',
+    tags: ['Redirect'],
+    summary: 'Resolve a short code and redirect to its target URL',
+    request: { params: codeParamSchema },
+    responses: {
+      302: { description: 'redirect to the target URL (status is 302, 307 or 308 depending on the link config)' },
+      404: { description: 'link not found' },
+    },
+  }),
+  async c => {
+    const { code } = c.req.valid('param')
+    if (!codeSchema.safeParse(code).success) return c.notFound()
 
-  const link = await linksService.resolve(code)
-  if (!link) return c.notFound()
+    const link = await linksService.resolve(code)
+    if (!link) return c.notFound()
 
-  return c.redirect(link.target_url, link.redirect_status)
-})
+    return c.redirect(link.target_url, link.redirect_status)
+  },
+)

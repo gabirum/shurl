@@ -1,5 +1,6 @@
 import { prometheus } from '@hono/prometheus'
-import { Hono } from 'hono'
+import { swaggerUI } from '@hono/swagger-ui'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { getConnInfo } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
@@ -26,7 +27,7 @@ process.on('unhandledRejection', reason => {
   process.exit(1)
 })
 
-const app = new Hono<{ Variables: RequestIdVariables & JwtVariables }>()
+const app = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
 const { printMetrics, registerMetrics } = prometheus({ collectDefaultMetrics: true })
 
 app.use(requestId())
@@ -65,6 +66,18 @@ app.get(
 
 app.route('/auth/links', managedLinks)
 app.route('/c', publicLinks)
+
+app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
+  type: 'http',
+  scheme: 'bearer',
+  bearerFormat: 'JWT',
+})
+
+app.doc('/openapi.json', {
+  openapi: '3.1.0',
+  info: { title: 'shurl', version: '1.0.0', description: 'URL shortener API' },
+})
+app.get('/docs', swaggerUI({ url: '/openapi.json' }))
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) return err.getResponse()

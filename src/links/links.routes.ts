@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
+import { ADMIN_ROLE, hasRole } from '../auth'
 import type { LinkRow } from './links.repository'
 import {
   codeParamSchema,
@@ -28,11 +29,16 @@ function ownerOf(c: Context<Env>): string {
   return payload.sub
 }
 
+function isAdmin(c: Context<Env>): boolean {
+  return hasRole(c.get('jwtPayload'), ADMIN_ROLE)
+}
+
 function toDto(link: LinkRow) {
   return {
     code: link.code,
     url: link.target_url,
     redirectStatus: link.redirect_status,
+    owner: link.owner,
     accessCount: Number(link.access_count),
     createdAt: link.created_at.toISOString(),
     updatedAt: link.updated_at.toISOString(),
@@ -68,7 +74,7 @@ managedLinks.openapi(
     path: '/',
     tags,
     security,
-    summary: 'List the caller’s links',
+    summary: 'List the caller’s links (all links, for admins)',
     request: { query: paginationSchema },
     responses: {
       200: { content: { 'application/json': { schema: linkPageSchema } }, description: 'paginated list of links' },
@@ -77,7 +83,7 @@ managedLinks.openapi(
   async c => {
     const owner = ownerOf(c)
     const pagination = c.req.valid('query')
-    const slice = await linksService.list(owner, pagination)
+    const slice = await linksService.list(owner, pagination, isAdmin(c))
     return c.json({ ...slice, data: slice.data.map(toDto) })
   },
 )
@@ -88,7 +94,7 @@ managedLinks.openapi(
     path: '/{code}',
     tags,
     security,
-    summary: 'Get a link by code',
+    summary: 'Get a link by code (any owner, for admins)',
     request: { params: codeParamSchema },
     responses: {
       200: { content: { 'application/json': { schema: linkSchema } }, description: 'the link' },
@@ -98,7 +104,7 @@ managedLinks.openapi(
   async c => {
     const owner = ownerOf(c)
     const { code } = c.req.valid('param')
-    const link = await linksService.get(owner, code)
+    const link = await linksService.get(owner, code, isAdmin(c))
     return c.json(toDto(link), 200)
   },
 )

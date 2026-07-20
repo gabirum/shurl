@@ -64,16 +64,18 @@ async function getOwned(owner: string, code: string): Promise<LinkRow> {
   return row
 }
 
-export function get(owner: string, code: string): Promise<LinkRow> {
-  return getOwned(owner, code)
+export async function get(owner: string, code: string, isAdmin = false): Promise<LinkRow> {
+  if (!isAdmin) return getOwned(owner, code)
+  const row = await repo.findByCode(code)
+  if (!row) throw new LinkNotFoundException()
+  return row
 }
 
-export async function list(owner: string, pagination: PaginationInput): Promise<Page<LinkRow>> {
+export async function list(owner: string, pagination: PaginationInput, isAdmin = false): Promise<Page<LinkRow>> {
   const { page, size } = pagination
-  const [rows, totalElements] = await Promise.all([
-    repo.listByOwner(owner, (page - 1) * size, size),
-    repo.countByOwner(owner),
-  ])
+  const [rows, totalElements] = isAdmin
+    ? await Promise.all([repo.listAll((page - 1) * size, size), repo.countAll()])
+    : await Promise.all([repo.listByOwner(owner, (page - 1) * size, size), repo.countByOwner(owner)])
   return createPage(rows, size, page, totalElements)
 }
 

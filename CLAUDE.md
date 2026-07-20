@@ -28,6 +28,7 @@ There is no test suite or build script defined yet.
 - `src/env.ts` validates required environment variables at startup using a Zod schema (`envSchema`). If validation fails, it logs the error and calls `process.exit(1)`. Any new required env var must be added to this schema (and to `.env.example`) or the app will refuse to boot.
 - `src/index.ts` builds the Hono app and wires global middleware, applied in this order: `requestId` → request logging (custom, logs method/path/status/duration via `logger`, level based on status code) → `cors` → `poweredBy` → `secureHeaders` → `prettyJSON` → Prometheus metrics registration.
   - `/auth/*` routes are protected by JWK-based JWT verification (`hono/jwk`), configured from `JWKS_URI`, `AUDIENCE`, and `JWK_ISSUER`. The verified payload is available as `c.get('jwtPayload')` (typed via `JwtVariables` from `hono/jwt`).
+  - `src/auth.ts` implements RBAC on top of the verified JWT: `JWT_ROLE_CLAIM` (e.g. `resource_access.shurl.roles`) is a dot-delimited path resolved against the JWT payload to find the roles claim (`getRoles`), which may be a single string or an array of strings — providers differ (Keycloak nests roles per-client, others use a flat claim). `hasRole(payload, ADMIN_ROLE)` checks for the `admin` role. Any authenticated user can create/manage their own links; the `admin` role only grants read access across all owners (`GET /auth/links` and `GET /auth/links/{code}` bypass owner-scoping — see `links.routes.ts`'s `isAdmin` helper and `links.service.ts`'s `isAdmin` parameter). There is currently no admin write/delete-any-link capability.
   - `/metrics` is protected by IP allowlisting (`hono/ip-restriction`, restricted to loopback and private ranges — no token) and serves Prometheus metrics via `@hono/prometheus` (registered with `collectDefaultMetrics: true`).
   - `/auth/links/*` (management, requires JWT) and `/c/:code` (public redirect) are mounted from `src/links/links.routes.ts`.
   - `await migrate()` runs before `export default app`, so the database schema is applied on every boot before the server starts accepting requests.
@@ -44,7 +45,7 @@ There is no test suite or build script defined yet.
 
 ## Environment variables
 
-Defined in `.env.example` / validated in `src/env.ts`: `LOG_LEVEL`, `JWKS_URI`, `JWK_ISSUER`, `AUDIENCE`, `DATABASE_URL` (must be a `mysql://` URL — used to construct the `Bun.sql` client in `src/db.ts`), `REDIS_URL` (`redis://`/`rediss://`/`valkey://` — read directly by the global `Bun.redis` client used in `links.cache.ts`, not passed through explicitly). `/metrics` is no longer gated by a token env var — it's IP-restricted instead (see Architecture above).
+Defined in `.env.example` / validated in `src/env.ts`: `LOG_LEVEL`, `JWKS_URI`, `JWK_ISSUER`, `AUDIENCE`, `JWT_ROLE_CLAIM` (dot-delimited path to the roles claim in the JWT payload, e.g. `resource_access.shurl.roles` — see `src/auth.ts`), `DATABASE_URL` (must be a `mysql://` URL — used to construct the `Bun.sql` client in `src/db.ts`), `REDIS_URL` (`redis://`/`rediss://`/`valkey://` — read directly by the global `Bun.redis` client used in `links.cache.ts`, not passed through explicitly). `/metrics` is no longer gated by a token env var — it's IP-restricted instead (see Architecture above).
 
 ## Hono documentation
 

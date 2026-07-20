@@ -54,6 +54,15 @@ export async function countByOwner(owner: string): Promise<number> {
   return Number(row.count)
 }
 
+export async function listAll(offset: number, limit: number): Promise<LinkRow[]> {
+  return sql<LinkRow[]>`SELECT * FROM links ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+}
+
+export async function countAll(): Promise<number> {
+  const [row] = await sql<[{ count: number }]>`SELECT COUNT(*) AS count FROM links`
+  return Number(row.count)
+}
+
 export interface LinkPatch {
   url?: string
   redirectStatus?: 302 | 307 | 308

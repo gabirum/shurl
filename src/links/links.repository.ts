@@ -76,8 +76,8 @@ export async function removeLink(code: string): Promise<void> {
   await sql`DELETE FROM links WHERE code = ${code}`
 }
 
-export async function bumpAccessCounts(hits: [code: string, count: number][]): Promise<void> {
-  if (hits.length === 0) return
+export async function bumpAccessCounts(hits: Map<string, number>): Promise<void> {
+  if (hits.size === 0) return
   await sql.begin(async tx => {
     for (const [code, count] of hits) {
       await tx`UPDATE links SET access_count = access_count + ${count} WHERE code = ${code}`

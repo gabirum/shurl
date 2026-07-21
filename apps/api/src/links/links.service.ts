@@ -3,7 +3,6 @@ import { recordHit } from './links.counter'
 import type { LinkRow } from './links.repository'
 import * as repo from './links.repository'
 import type { CreateLinkInput, PaginationInput, UpdateLinkInput } from './links.schema'
-import { PERMANENT_REDIRECT_STATUS } from './links.schema'
 import type { Page } from '../util'
 import { createPage, Exception } from '../util'
 import { logger } from '../logger'
@@ -18,12 +17,17 @@ export class LinkImmutableException extends Exception {
     super('E_LINK_IMMUTABLE', 'permanent links cannot be modified', 409)
   }
 }
+export class CodeGenerationExhaustedException extends Exception {
+  constructor() {
+    super('E_CODE_GENERATION', 'failed to generate a unique code after multiple attempts', 503)
+  }
+}
 
-const CODE_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-const CODE_LENGTH = 7
+export const CODE_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+export const CODE_LENGTH = 7
 const MAX_GENERATION_ATTEMPTS = 5
 
-function generateCode(): string {
+export function generateCode(): string {
   const bytes = new Uint8Array(CODE_LENGTH)
   crypto.getRandomValues(bytes)
   let code = ''
@@ -37,7 +41,8 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
   if (input.code) {
     await repo.insertLink({ ...newLink, code: input.code })
     logger.info({ owner, code: input.code, redirectStatus: input.redirectStatus }, 'link created')
-    const row = (await repo.findByCode(input.code))!
+    const row = await repo.findByCode(input.code)
+    if (!row) throw new LinkNotFoundException()
     await setCachedLink(input.code, row)
     return row
   }
@@ -47,7 +52,8 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
     try {
       await repo.insertLink({ ...newLink, code })
       logger.info({ owner, code, redirectStatus: input.redirectStatus }, 'link created')
-      const row = (await repo.findByCode(code))!
+      const row = await repo.findByCode(code)
+      if (!row) throw new LinkNotFoundException()
       await setCachedLink(code, row)
       return row
     } catch (error) {
@@ -55,7 +61,7 @@ export async function create(owner: string, input: CreateLinkInput): Promise<Lin
       throw error
     }
   }
-  throw new Error('failed to generate a unique code after multiple attempts')
+  throw new CodeGenerationExhaustedException()
 }
 
 async function getOwned(owner: string, code: string): Promise<LinkRow> {
@@ -79,20 +85,27 @@ export async function list(owner: string, pagination: PaginationInput, isAdmin =
   return createPage(rows, size, page, totalElements)
 }
 
+// A conditional write (with owner + 308 guards in its WHERE) reporting no rows affected is
+// ambiguous: the row may be gone, owned by someone else, or immutable. Re-read to map it to the
+// right status — 404 for missing/not-owned (never leak existence to a non-owner), 409 for 308.
+async function explainNoop(owner: string, code: string): Promise<never> {
+  const row = await repo.findByCode(code)
+  if (!row || row.owner !== owner) throw new LinkNotFoundException()
+  throw new LinkImmutableException()
+}
+
 export async function update(owner: string, code: string, patch: UpdateLinkInput): Promise<LinkRow> {
+  const updated = await repo.updateLink(code, owner, { url: patch.url, redirectStatus: patch.redirectStatus })
+  if (!updated) await explainNoop(owner, code)
   const row = await getOwned(owner, code)
-  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
-  await repo.updateLink(code, { url: patch.url, redirectStatus: patch.redirectStatus })
   logger.info({ owner, code, patch }, 'link updated')
-  const updated = await getOwned(owner, code)
-  await setCachedLink(code, updated)
-  return updated
+  await setCachedLink(code, row)
+  return row
 }
 
 export async function remove(owner: string, code: string): Promise<void> {
-  const row = await getOwned(owner, code)
-  if (row.redirect_status === PERMANENT_REDIRECT_STATUS) throw new LinkImmutableException()
-  await repo.removeLink(code)
+  const removed = await repo.removeLink(code, owner)
+  if (!removed) await explainNoop(owner, code)
   await invalidateLink(code)
   logger.info({ owner, code }, 'link removed')
 }

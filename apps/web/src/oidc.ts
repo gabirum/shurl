@@ -10,7 +10,7 @@ export const { bootstrapOidc, useOidc, getOidc, enforceLogin, OidcInitialization
   .createUtils()
 
 bootstrapOidc(
-  import.meta.env.VITE_OIDC_USE_MOCK
+  import.meta.env.VITE_OIDC_USE_MOCK === 'true'
     ? { implementation: 'mock', isUserInitiallyLoggedIn: true }
     : { implementation: 'real', clientId: OIDC_CLIENT_ID, issuerUri: OIDC_ISSUER },
 )

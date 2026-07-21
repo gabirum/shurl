@@ -7,12 +7,12 @@ import { HTTPException } from 'hono/http-exception'
 import { ipRestriction } from 'hono/ip-restriction'
 import { jwk } from 'hono/jwk'
 import type { JwtVariables } from 'hono/jwt'
-import { poweredBy } from 'hono/powered-by'
 import { prettyJSON } from 'hono/pretty-json'
 import { requestId, RequestIdVariables } from 'hono/request-id'
 import { secureHeaders } from 'hono/secure-headers'
 import { migrate } from './db'
 import env from './env'
+import { flushNow } from './links/links.counter'
 import { managedLinks, publicLinks } from './links/links.routes'
 import { logger } from './logger'
 import { Exception } from './util'
@@ -22,10 +22,24 @@ process.on('uncaughtException', error => {
   process.exit(1)
 })
 
+// Deliberately not fail-fast here: an unhandled rejection is usually a single
+// missed `.catch` on a best-effort call (e.g. cache write), not a corrupted
+// process state — logging and continuing avoids taking the instance down
+// under normal traffic. Genuinely fatal errors still surface as uncaughtException.
 process.on('unhandledRejection', reason => {
-  logger.fatal({ err: reason }, 'unhandled promise rejection, terminating')
-  process.exit(1)
+  logger.error({ err: reason }, 'unhandled promise rejection')
 })
+
+let shuttingDown = false
+async function shutdown(signal: string) {
+  if (shuttingDown) return
+  shuttingDown = true
+  logger.info({ signal }, 'shutting down, flushing pending access counts')
+  await flushNow()
+  process.exit(0)
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'))
+process.on('SIGINT', () => void shutdown('SIGINT'))
 
 const app = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
 const { printMetrics, registerMetrics } = prometheus({ collectDefaultMetrics: true })
@@ -45,8 +59,7 @@ app.use(async (c, next) => {
   else if (c.res.status >= 400) logger.warn(fields, 'request completed')
   else logger.info(fields, 'request completed')
 })
-app.use(cors())
-app.use(poweredBy())
+app.use(cors({ origin: env.CORS_ORIGIN }))
 app.use(secureHeaders())
 app.use(prettyJSON())
 app.use(registerMetrics)
@@ -56,10 +69,12 @@ app.use(
   jwk({ alg: ['RS256'], jwks_uri: env.JWKS_URI, verification: { aud: env.AUDIENCE, iss: env.JWK_ISSUER } }),
 )
 
+app.get('/health', c => c.text('ok'))
+
 app.get(
   '/metrics',
   ipRestriction(getConnInfo, {
-    allowList: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/8', 'fc00::/7'],
+    allowList: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'],
   }),
   printMetrics,
 )

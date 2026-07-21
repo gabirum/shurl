@@ -6,7 +6,6 @@ import { ADMIN_ROLE, hasRole } from '../auth'
 import type { LinkRow } from './links.repository'
 import {
   codeParamSchema,
-  codeSchema,
   createLinkSchema,
   errorSchema,
   linkPageSchema,
@@ -172,8 +171,6 @@ export const publicLinks = new OpenAPIHono().openapi(
   }),
   async c => {
     const { code } = c.req.valid('param')
-    if (!codeSchema.safeParse(code).success) return c.notFound()
-
     const link = await linksService.resolve(code)
     if (!link) return c.notFound()
 

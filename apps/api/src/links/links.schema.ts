@@ -14,9 +14,14 @@ export const codeParamSchema = z.object({ code: codeSchema })
 // value of a multi-value z.literal() (it otherwise renders `enum: [302]` instead of all three).
 const redirectStatusSchema = z.literal(REDIRECT_STATUSES).openapi({ enum: REDIRECT_STATUSES as unknown as number[] })
 
+const targetUrlSchema = z
+  .url({ protocol: /^https?$/ })
+  .max(2048)
+  .openapi({ example: 'https://example.com/some/very/long/path' })
+
 export const createLinkSchema = z
   .object({
-    url: z.url().openapi({ example: 'https://example.com/some/very/long/path' }),
+    url: targetUrlSchema,
     redirectStatus: redirectStatusSchema.openapi({
       example: 302,
       description: '302/307 are temporary, 308 makes the link permanently immutable',
@@ -27,7 +32,7 @@ export const createLinkSchema = z
 
 export const updateLinkSchema = z
   .object({
-    url: z.url().optional().openapi({ example: 'https://example.com/new-target' }),
+    url: targetUrlSchema.optional().openapi({ example: 'https://example.com/new-target' }),
     redirectStatus: redirectStatusSchema.optional().openapi({ example: 307 }),
   })
   .refine(data => data.url !== undefined || data.redirectStatus !== undefined, {

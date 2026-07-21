@@ -32,16 +32,21 @@ export async function migrate() {
         )
       `
 
+      // Not wrapped in a transaction: MySQL DDL implicit-commits, so `begin(...)` here would
+      // give no real atomicity anyway — it would just make a mid-file failure on a
+      // multi-statement migration look uncommitted when the DDL already landed, causing a
+      // re-run to fail (e.g. "table already exists") since schema_migrations was rolled back
+      // but the schema change wasn't. Every migration file must therefore be either
+      // idempotent (`IF NOT EXISTS` / `IF EXISTS`) or a single statement, so a failure never
+      // leaves partial, unrecorded DDL applied.
       const files = Array.from(new Glob('*.sql').scanSync({ cwd: migrationsDir })).sort()
-      await reserved.begin(async tx => {
-        for (const name of files) {
-          const [applied] = await tx`SELECT 1 FROM schema_migrations WHERE name = ${name}`
-          if (applied) continue
-          await tx.file(`${migrationsDir}/${name}`)
-          await tx`INSERT INTO schema_migrations (name) VALUES (${name})`
-          logger.info({ migration: name }, 'applied database migration')
-        }
-      })
+      for (const name of files) {
+        const [applied] = await reserved`SELECT 1 FROM schema_migrations WHERE name = ${name}`
+        if (applied) continue
+        await reserved.file(`${migrationsDir}/${name}`)
+        await reserved`INSERT INTO schema_migrations (name) VALUES (${name})`
+        logger.info({ migration: name }, 'applied database migration')
+      }
     } finally {
       await reserved`SELECT RELEASE_LOCK(${MIGRATION_LOCK_NAME})`
     }

@@ -25,7 +25,7 @@ function CopyCodeButton({ code }: { code: string }) {
             variant="ghost"
             size="icon-xs"
             onClick={() => {
-              void navigator.clipboard.writeText(`${API_URL}/c/${code}`)
+              void navigator.clipboard.writeText(`${API_URL.replace(/\/+$/, '')}/c/${code}`)
               toast.success('Short URL copied')
             }}
           />
@@ -74,15 +74,21 @@ export function LinksTable({
                 </div>
               </TableCell>
               <TableCell className="max-w-xs">
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block truncate text-foreground underline-offset-4 hover:underline"
-                  title={link.url}
-                >
-                  {link.url}
-                </a>
+                {/^https?:\/\//i.test(link.url) ? (
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-foreground underline-offset-4 hover:underline"
+                    title={link.url}
+                  >
+                    {link.url}
+                  </a>
+                ) : (
+                  <span className="block truncate text-muted-foreground" title={link.url}>
+                    {link.url}
+                  </span>
+                )}
               </TableCell>
               <TableCell>
                 <LinkStatusBadge status={link.redirectStatus} />

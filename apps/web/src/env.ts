@@ -11,7 +11,9 @@ declare global {
 }
 
 const getEnv = (k: keyof RuntimeEnv) =>
-  window.RUNTIME_ENV[k] === `$\{${k}}` ? import.meta.env[`VITE_${k}`] : window.RUNTIME_ENV[k]
+  window.RUNTIME_ENV?.[k] === `$\{${k}}` || window.RUNTIME_ENV?.[k] === undefined
+    ? import.meta.env[`VITE_${k}`]
+    : window.RUNTIME_ENV[k]
 
 export const API_URL = getEnv('API_URL')
 export const OIDC_ISSUER = getEnv('OIDC_ISSUER')

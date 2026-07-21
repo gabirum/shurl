@@ -19,6 +19,7 @@ export async function flushNow(): Promise<void> {
     await bumpAccessCounts(hits)
     logger.debug({ count: hits.size }, 'flushed link access counts')
   } catch (error) {
+    for (const [code, count] of pending) hits.set(code, (hits.get(code) ?? 0) + count)
     pending = hits
     logger.error({ err: error }, 'failed to flush link access counts')
   } finally {

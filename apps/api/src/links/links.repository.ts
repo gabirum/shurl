@@ -1,4 +1,5 @@
 import { sql, SQL } from 'bun'
+import { PERMANENT_REDIRECT_STATUS } from './links.schema'
 import { Exception } from '../util'
 
 export interface LinkRow {
@@ -45,7 +46,7 @@ export async function findByCode(code: string): Promise<LinkRow | undefined> {
 
 export async function listByOwner(owner: string, offset: number, limit: number): Promise<LinkRow[]> {
   return sql<LinkRow[]>`
-    SELECT * FROM links WHERE owner = ${owner} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+    SELECT * FROM links WHERE owner = ${owner} ORDER BY created_at DESC, code DESC LIMIT ${limit} OFFSET ${offset}
   `
 }
 
@@ -55,7 +56,7 @@ export async function countByOwner(owner: string): Promise<number> {
 }
 
 export async function listAll(offset: number, limit: number): Promise<LinkRow[]> {
-  return sql<LinkRow[]>`SELECT * FROM links ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+  return sql<LinkRow[]>`SELECT * FROM links ORDER BY created_at DESC, code DESC LIMIT ${limit} OFFSET ${offset}`
 }
 
 export async function countAll(): Promise<number> {
@@ -68,21 +69,41 @@ export interface LinkPatch {
   redirectStatus?: 302 | 307 | 308
 }
 
-export async function updateLink(code: string, patch: LinkPatch): Promise<void> {
+// Returns whether a row was actually modified. Ownership and the 308-immutability guard are both
+// in the WHERE clause so the write is atomic: it closes the check-then-act race where a concurrent
+// request could flip a link to 308 between a prior read and this update, and it makes the function
+// safe to call without a separate ownership pre-check (a 0-row result is then disambiguated into
+// 404 vs 409 by the caller — see links.service.ts's explainNoop).
+export async function updateLink(code: string, owner: string, patch: LinkPatch): Promise<boolean> {
+  let result
   if (patch.url !== undefined && patch.redirectStatus !== undefined) {
-    await sql`
+    result = await sql`
       UPDATE links SET target_url = ${patch.url}, redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
-      WHERE code = ${code}
+      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else if (patch.url !== undefined) {
-    await sql`UPDATE links SET target_url = ${patch.url}, updated_at = CURRENT_TIMESTAMP WHERE code = ${code}`
+    result = await sql`
+      UPDATE links SET target_url = ${patch.url}, updated_at = CURRENT_TIMESTAMP
+      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+    `
   } else if (patch.redirectStatus !== undefined) {
-    await sql`UPDATE links SET redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP WHERE code = ${code}`
+    result = await sql`
+      UPDATE links SET redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
+      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+    `
+  } else {
+    return true
   }
+  return result.affectedRows > 0
 }
 
-export async function removeLink(code: string): Promise<void> {
-  await sql`DELETE FROM links WHERE code = ${code}`
+// Same atomicity reasoning as updateLink: the guard prevents deleting a link that became
+// immutable, or that belongs to another owner, after the caller's last read.
+export async function removeLink(code: string, owner: string): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM links WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+  `
+  return result.affectedRows > 0
 }
 
 export async function bumpAccessCounts(hits: Map<string, number>): Promise<void> {

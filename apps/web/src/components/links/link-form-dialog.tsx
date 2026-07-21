@@ -46,6 +46,7 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['links'] })
       toast.success(mode === 'create' ? 'Link created' : 'Link updated')
       onOpenChange(false)
+      reset()
     },
     onError: (err: unknown) => {
       setError(err instanceof LinkApiError ? err.message : 'Something went wrong')

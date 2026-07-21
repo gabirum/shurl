@@ -6,7 +6,7 @@ import { getOidc } from './oidc'
 export const api = hc<AppType>(API_URL, {
   headers: async () => {
     const oidc = await getOidc()
-    const headers: Record<string, string> = { 'X-Requested-With': 'hc' }
+    const headers: Record<string, string> = {}
     if (oidc.isUserLoggedIn) headers.Authorization = `Bearer ${await oidc.getAccessToken()}`
     return headers
   },

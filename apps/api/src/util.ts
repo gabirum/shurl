@@ -45,11 +45,11 @@ export function createSlice<T>(data: T[], requestedSize: number, requestedPage: 
  * @returns the page object
  */
 export function createPage<T>(data: T[], requestedSize: number, requestedPage: number, totalElements: number): Page<T> {
-  const totalPages = Math.ceil(totalElements / requestedSize)
+  const totalPages = Math.max(1, Math.ceil(totalElements / requestedSize))
   return {
     data,
     isFirst: requestedPage === 1,
-    isLast: requestedPage === totalPages,
+    isLast: requestedPage >= totalPages,
     hasNext: requestedPage < totalPages,
     hasPrevious: requestedPage > 1,
     totalPages,

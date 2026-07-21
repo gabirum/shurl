@@ -8,6 +8,10 @@ const envSchema = z.object({
   JWT_ROLE_CLAIM: z.string(),
   DATABASE_URL: z.url({ protocol: /^mysql$/ }),
   REDIS_URL: z.url({ protocol: /^(redis|rediss|valkey)$/ }),
+  CORS_ORIGIN: z
+    .string()
+    .transform(value => value.split(',').map(origin => origin.trim()))
+    .pipe(z.array(z.url({ protocol: /^https?$/ }))),
 })
 
 const { data: env, error } = envSchema.safeParse(Bun.env)

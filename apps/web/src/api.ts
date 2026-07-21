@@ -1,19 +1,13 @@
-import ky from 'ky'
+import type { AppType } from '@shurl/api'
+import { hc } from 'hono/client'
 import { API_URL } from './env'
 import { getOidc } from './oidc'
 
-export const api = ky.create({
-  baseUrl: API_URL,
-  headers: { 'X-Requested-With': 'ky' },
-  hooks: {
-    beforeRequest: [
-      async ({ request }) => {
-        const oidc = await getOidc()
-        if (oidc.isUserLoggedIn) {
-          const accessToken = await oidc.getAccessToken()
-          request.headers.set('Authorization', `Bearer ${accessToken}`)
-        }
-      },
-    ],
+export const api = hc<AppType>(API_URL, {
+  headers: async () => {
+    const oidc = await getOidc()
+    const headers: Record<string, string> = { 'X-Requested-With': 'hc' }
+    if (oidc.isUserLoggedIn) headers.Authorization = `Bearer ${await oidc.getAccessToken()}`
+    return headers
   },
 })

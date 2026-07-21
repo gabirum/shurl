@@ -64,8 +64,7 @@ app.get(
   printMetrics,
 )
 
-app.route('/auth/links', managedLinks)
-app.route('/c', publicLinks)
+const routes = app.route('/auth/links', managedLinks).route('/c', publicLinks)
 
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',
@@ -96,4 +95,6 @@ try {
 
 logger.info('shurl ready')
 
-export default app
+export type AppType = typeof routes
+
+export default routes

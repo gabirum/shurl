@@ -46,126 +46,119 @@ function toDto(link: LinkRow) {
 }
 
 export const managedLinks = new OpenAPIHono<Env>()
-
-managedLinks.openapi(
-  createRoute({
-    method: 'post',
-    path: '/',
-    tags,
-    security,
-    summary: 'Create a link',
-    request: { body: { required: true, content: { 'application/json': { schema: createLinkSchema } } } },
-    responses: {
-      201: { content: { 'application/json': { schema: linkSchema } }, description: 'link created' },
-      409: { content: { 'application/json': { schema: errorSchema } }, description: 'code already in use' },
-    },
-  }),
-  async c => {
-    const owner = ownerOf(c)
-    const input = c.req.valid('json')
-    const link = await linksService.create(owner, input)
-    return c.json(toDto(link), 201)
-  },
-)
-
-managedLinks.openapi(
-  createRoute({
-    method: 'get',
-    path: '/',
-    tags,
-    security,
-    summary: 'List the caller’s links (all links, for admins)',
-    request: { query: paginationSchema },
-    responses: {
-      200: { content: { 'application/json': { schema: linkPageSchema } }, description: 'paginated list of links' },
-    },
-  }),
-  async c => {
-    const owner = ownerOf(c)
-    const pagination = c.req.valid('query')
-    const slice = await linksService.list(owner, pagination, isAdmin(c))
-    return c.json({ ...slice, data: slice.data.map(toDto) })
-  },
-)
-
-managedLinks.openapi(
-  createRoute({
-    method: 'get',
-    path: '/{code}',
-    tags,
-    security,
-    summary: 'Get a link by code (any owner, for admins)',
-    request: { params: codeParamSchema },
-    responses: {
-      200: { content: { 'application/json': { schema: linkSchema } }, description: 'the link' },
-      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
-    },
-  }),
-  async c => {
-    const owner = ownerOf(c)
-    const { code } = c.req.valid('param')
-    const link = await linksService.get(owner, code, isAdmin(c))
-    return c.json(toDto(link), 200)
-  },
-)
-
-managedLinks.openapi(
-  createRoute({
-    method: 'patch',
-    path: '/{code}',
-    tags,
-    security,
-    summary: 'Update a link',
-    request: {
-      params: codeParamSchema,
-      body: { required: true, content: { 'application/json': { schema: updateLinkSchema } } },
-    },
-    responses: {
-      200: { content: { 'application/json': { schema: linkSchema } }, description: 'link updated' },
-      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
-      409: {
-        content: { 'application/json': { schema: errorSchema } },
-        description: 'permanent links cannot be modified',
+  .openapi(
+    createRoute({
+      method: 'post',
+      path: '/',
+      tags,
+      security,
+      summary: 'Create a link',
+      request: { body: { required: true, content: { 'application/json': { schema: createLinkSchema } } } },
+      responses: {
+        201: { content: { 'application/json': { schema: linkSchema } }, description: 'link created' },
+        409: { content: { 'application/json': { schema: errorSchema } }, description: 'code already in use' },
       },
+    }),
+    async c => {
+      const owner = ownerOf(c)
+      const input = c.req.valid('json')
+      const link = await linksService.create(owner, input)
+      return c.json(toDto(link), 201)
     },
-  }),
-  async c => {
-    const owner = ownerOf(c)
-    const { code } = c.req.valid('param')
-    const patch = c.req.valid('json')
-    const link = await linksService.update(owner, code, patch)
-    return c.json(toDto(link), 200)
-  },
-)
-
-managedLinks.openapi(
-  createRoute({
-    method: 'delete',
-    path: '/{code}',
-    tags,
-    security,
-    summary: 'Delete a link',
-    request: { params: codeParamSchema },
-    responses: {
-      204: { description: 'link removed' },
-      404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
-      409: {
-        content: { 'application/json': { schema: errorSchema } },
-        description: 'permanent links cannot be modified',
+  )
+  .openapi(
+    createRoute({
+      method: 'get',
+      path: '/',
+      tags,
+      security,
+      summary: 'List the caller’s links (all links, for admins)',
+      request: { query: paginationSchema },
+      responses: {
+        200: { content: { 'application/json': { schema: linkPageSchema } }, description: 'paginated list of links' },
       },
+    }),
+    async c => {
+      const owner = ownerOf(c)
+      const pagination = c.req.valid('query')
+      const slice = await linksService.list(owner, pagination, isAdmin(c))
+      return c.json({ ...slice, data: slice.data.map(toDto) })
     },
-  }),
-  async c => {
-    const owner = ownerOf(c)
-    const { code } = c.req.valid('param')
-    await linksService.remove(owner, code)
-    return c.body(null, 204)
-  },
-)
+  )
+  .openapi(
+    createRoute({
+      method: 'get',
+      path: '/{code}',
+      tags,
+      security,
+      summary: 'Get a link by code (any owner, for admins)',
+      request: { params: codeParamSchema },
+      responses: {
+        200: { content: { 'application/json': { schema: linkSchema } }, description: 'the link' },
+        404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+      },
+    }),
+    async c => {
+      const owner = ownerOf(c)
+      const { code } = c.req.valid('param')
+      const link = await linksService.get(owner, code, isAdmin(c))
+      return c.json(toDto(link), 200)
+    },
+  )
+  .openapi(
+    createRoute({
+      method: 'patch',
+      path: '/{code}',
+      tags,
+      security,
+      summary: 'Update a link',
+      request: {
+        params: codeParamSchema,
+        body: { required: true, content: { 'application/json': { schema: updateLinkSchema } } },
+      },
+      responses: {
+        200: { content: { 'application/json': { schema: linkSchema } }, description: 'link updated' },
+        404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+        409: {
+          content: { 'application/json': { schema: errorSchema } },
+          description: 'permanent links cannot be modified',
+        },
+      },
+    }),
+    async c => {
+      const owner = ownerOf(c)
+      const { code } = c.req.valid('param')
+      const patch = c.req.valid('json')
+      const link = await linksService.update(owner, code, patch)
+      return c.json(toDto(link), 200)
+    },
+  )
+  .openapi(
+    createRoute({
+      method: 'delete',
+      path: '/{code}',
+      tags,
+      security,
+      summary: 'Delete a link',
+      request: { params: codeParamSchema },
+      responses: {
+        204: { description: 'link removed' },
+        404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
+        409: {
+          content: { 'application/json': { schema: errorSchema } },
+          description: 'permanent links cannot be modified',
+        },
+      },
+    }),
+    async c => {
+      const owner = ownerOf(c)
+      const { code } = c.req.valid('param')
+      await linksService.remove(owner, code)
+      return c.body(null, 204)
+    },
+  )
 
-export const publicLinks = new OpenAPIHono()
-
-publicLinks.openapi(
+export const publicLinks = new OpenAPIHono().openapi(
   createRoute({
     method: 'get',
     path: '/{code}',

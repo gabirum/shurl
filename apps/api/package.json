@@ -2,7 +2,8 @@
   "name": "@shurl/api",
   "private": true,
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "lint": "eslint . --ext .ts"
   },
   "dependencies": {
     "@hono/prometheus": "^1.0.3",

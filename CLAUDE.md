@@ -6,20 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `shurl` is a URL shortener service with a package-by-feature architecture (see `apps/api/src/links/`). Persistence uses **`Bun.sql` directly (MySQL) — no ORM**; vendor lock-in to Bun/MySQL/Redis is an accepted tradeoff. Prefer Bun/Web-standard built-ins (`Bun.sql`, `Bun.redis`, `Glob`, `crypto.getRandomValues`, `setInterval`) over adding new dependencies.
 
-The repo is a **Bun workspaces monorepo** (`workspaces: ["apps/*"]` in the root `package.json`) with a single app today (`apps/api`). New apps/services go under `apps/`; shared code, once there's more than one consumer, goes under `packages/` (doesn't exist yet — don't create it preemptively).
+The repo is a **Bun workspaces monorepo** (`workspaces: ["apps/*"]` in the root `package.json`) with two apps today: `apps/api` (`@shurl/api`, the Hono backend) and `apps/web` (`@shurl/web`, the React frontend). New apps/services go under `apps/`; shared code, once there's more than one consumer, goes under `packages/` (doesn't exist yet — don't create it preemptively).
 
 ## Commands
 
 This project uses **Bun**, not Node/npm.
 
 - Install dependencies (from repo root): `bun install`
-- Run dev server (hot reload): `bun run dev` — runs `bun run --filter '*' dev`, which fans out to each workspace package's `dev` script (currently just `@shurl/api`, serving on http://localhost:3000). Bun's `--filter` accepts a workspace-name/path glob, so a specific app can be targeted directly, e.g. `bun run --filter '@shurl/api' dev`.
-- Lint: `bun run lint` (ESLint over `.ts` files, repo-wide from the root `eslint.config.mts`)
-- Format: `bun run write` (Prettier, writes in place, repo-wide)
+- Run dev server (hot reload): `bun run dev` — runs `bun run --filter '*' dev`, which fans out to each workspace package's `dev` script: `@shurl/api` (Hono, http://localhost:3000) and `@shurl/web` (Vite, http://localhost:5173). Bun's `--filter` accepts a workspace-name/path glob, so a specific app can be targeted directly, e.g. `bun run --filter '@shurl/web' dev`.
+- Lint: `bun run lint` — runs `bun run --filter '*' lint`, fanning out to each workspace's own `lint` script. `@shurl/api` has no `eslint.config.*` of its own, so ESLint (invoked from `apps/api`) resolves the root `eslint.config.mts` by walking up. `@shurl/web` has its own `apps/web/eslint.config.js` (React/JSX-aware: hooks, fast-refresh, TanStack Query rules) which takes precedence over the root config for that workspace — don't try to fold web's rules into the root config, ESLint flat config only uses the nearest config file per directory, not a merge.
+- Format: `bun run write` (Prettier, writes in place, repo-wide) — one shared `.prettierrc` at the repo root covers both apps; `apps/web` has no `.prettierrc` of its own.
+- Build the frontend: `bun run --filter '@shurl/web' build` (`tsc -b && vite build`); `@shurl/api` has no build step (`bun run src/index.ts` runs the TS source directly).
 
-Root-level scripts (`lint`, `write`) run directly against the whole repo (`.`) rather than per-workspace — there's no per-package config to fan out to.
-
-There is no test suite or build script defined yet.
+There is no test suite defined yet.
 
 ### Docker
 
@@ -47,9 +46,20 @@ There is no test suite or build script defined yet.
   - `links.cache.ts` — two-tier cache for `resolve()`, the public redirect hot path: an in-process LRU (`Map`, capacity/TTL-bound, `L1_MAX_ENTRIES`/`L1_TTL_MS`) backed by a shared Redis tier (`Bun.redis`, the global singleton client, `L2_TTL_SECONDS`) so cache writes are visible across horizontally-scaled instances without waiting on L1 to expire. Caches both hits (`LinkRow`) and confirmed misses (`null`, to absorb code-guessing traffic) keyed by short code. `create`/`update` populate the cache with the fresh row; `remove` invalidates it. Redis errors on read/write/invalidate are caught and logged (`logger.warn`) rather than thrown — the cache is best-effort and callers fall back to `links.repository.ts`.
   - `links.routes.ts` — two Hono routers: `managedLinks` (CRUD, mounted at `/auth/links`, already covered by the global JWK middleware) and `publicLinks` (`GET /:code` → `c.redirect(url, status)`, mounted at `/c`).
 
+### Frontend (`apps/web`)
+
+React + Vite + TanStack Router/Query + `shadcn/ui` (Tailwind v4). File-based routing under `apps/web/src/routes/` (route tree is codegen'd to `apps/web/src/routeTree.gen.ts` by `@tanstack/router-plugin`'s Vite plugin — **gitignored, regenerated on every dev/build run, don't hand-edit it**). `_auth/*` routes are gated by `enforceLogin` in their route's `beforeLoad` (`apps/web/src/routes/_auth/route.tsx`).
+
+- `apps/web/src/env.ts` reads config from `window.RUNTIME_ENV` first (for container/runtime injection, e.g. `${API_URL}`-style placeholders swapped at deploy time), falling back to Vite's build-time `import.meta.env.VITE_*` — see `getEnv`.
+- `apps/web/src/oidc.ts` wraps `oidc-spa` (`oidcSpa.withExpectedDecodedIdTokenShape(...).createUtils()`), exporting `useOidc`/`getOidc`/`enforceLogin`/`OidcInitializationGate`. `VITE_OIDC_USE_MOCK=true` swaps in a mock implementation (`isUserInitiallyLoggedIn: true`, no real IdP) for local dev — mirror this when adding new auth-gated UI so it still works against the mock.
+- `apps/web/src/api.ts` is a shared `ky` instance (`baseUrl: API_URL`) whose `beforeRequest` hook attaches `Authorization: Bearer <accessToken>` from `oidc-spa` when the user is logged in — new API calls should go through this instance rather than raw `fetch`.
+- shadcn components live under `apps/web/src/components/ui/`; the `.claude/skills/shadcn` skill (project-local, only active under `apps/web/`) covers adding/customizing them — see `apps/web/components.json` and `apps/web/.mcp.json`.
+
 ## Environment variables
 
 Defined in `apps/api/.env.example` / validated in `apps/api/src/env.ts`: `LOG_LEVEL`, `JWKS_URI`, `JWK_ISSUER`, `AUDIENCE`, `JWT_ROLE_CLAIM` (dot-delimited path to the roles claim in the JWT payload, e.g. `resource_access.shurl.roles` — see `apps/api/src/auth.ts`), `DATABASE_URL` (must be a `mysql://` URL — used to construct the `Bun.sql` client in `apps/api/src/db.ts`), `REDIS_URL` (`redis://`/`rediss://`/`valkey://` — read directly by the global `Bun.redis` client used in `links.cache.ts`, not passed through explicitly). `/metrics` is no longer gated by a token env var — it's IP-restricted instead (see Architecture above). Bun loads `.env` relative to process cwd, which for local `bun run dev` (via `--filter`) and for the Docker images is `apps/api` — so `.env` lives at `apps/api/.env`, not the repo root.
+
+`apps/web` has its own env file, `apps/web/.env.local` (Vite convention — not `.env`, and gitignored via `*.local`; `apps/web/.env.example` documents the shape): `VITE_API_URL`, `VITE_OIDC_USE_MOCK`, `VITE_OIDC_ISSUER`, `VITE_OIDC_CLIENT_ID`. These are build-time fallbacks read by `apps/web/src/env.ts`'s `getEnv` when `window.RUNTIME_ENV` hasn't overridden them at runtime.
 
 ## Hono documentation
 
@@ -57,6 +67,6 @@ This project's web framework is Hono. For questions on its API (routing, context
 
 ## Conventions
 
-- No semicolons, single quotes, no arrow-parens on single params, 120 print width (see `.prettierrc`).
-- ESLint config (`eslint.config.mts`) extends `@eslint/js` recommended + `typescript-eslint` recommended.
-- TypeScript `strict` mode is on; JSX (if used) uses `hono/jsx` as the JSX import source.
+- No semicolons, single quotes, no arrow-parens on single params, 120 print width (see root `.prettierrc`, shared by both apps).
+- Root ESLint config (`eslint.config.mts`, used by `@shurl/api`) extends `@eslint/js` recommended + `typescript-eslint` recommended. `@shurl/web` has its own `apps/web/eslint.config.js` layering React Hooks/Fast Refresh/TanStack Query rules on top of the same base (see Commands above).
+- TypeScript `strict` mode is on in both apps. JSX: `apps/api` uses `hono/jsx` as the JSX import source (for any server-rendered JSX); `apps/web` uses the standard `react-jsx` runtime.

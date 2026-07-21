@@ -1,10 +1,12 @@
 {
   "name": "shurl",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "bun run --filter '*' dev",
-    "lint": "eslint . --ext .ts",
+    "lint": "bun run --filter '*' lint",
     "write": "prettier -w ."
   },
   "devDependencies": {

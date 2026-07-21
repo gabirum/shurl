@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-const getEnv = (k: keyof RuntimeEnv): string =>
+const getEnv = (k: keyof RuntimeEnv) =>
   window.RUNTIME_ENV[k] === `$\{${k}}` ? import.meta.env[`VITE_${k}`] : window.RUNTIME_ENV[k]
 
 export const API_URL = getEnv('API_URL')

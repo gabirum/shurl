@@ -2,15 +2,17 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: apps/api/Dockerfile.dev
     develop:
       watch:
         - action: sync+restart
-          path: ./src
-          target: /app/src
+          path: ./apps/api/src
+          target: /app/apps/api/src
           initial_sync: true
         - action: rebuild
           path: package.json
+        - action: rebuild
+          path: apps/api/package.json
     depends_on:
       database:
         condition: service_healthy
@@ -20,7 +22,7 @@ services:
       - DATABASE_URL=mysql://shurl:shurl@database:3306/shurl
       - REDIS_URL=redis://redis:6379
     env_file:
-      - .env
+      - apps/api/.env
     ports:
       - 3000:3000
 

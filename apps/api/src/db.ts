@@ -19,7 +19,9 @@ export async function migrate() {
       SELECT GET_LOCK(${MIGRATION_LOCK_NAME}, ${MIGRATION_LOCK_TIMEOUT_SECONDS}) AS acquired
     `
     if (acquired !== 1) {
-      throw new Error(`failed to acquire migration lock '${MIGRATION_LOCK_NAME}' after ${MIGRATION_LOCK_TIMEOUT_SECONDS}s`)
+      throw new Error(
+        `failed to acquire migration lock '${MIGRATION_LOCK_NAME}' after ${MIGRATION_LOCK_TIMEOUT_SECONDS}s`,
+      )
     }
 
     try {

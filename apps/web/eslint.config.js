@@ -19,4 +19,15 @@ export default defineConfig([
     ],
     languageOptions: { globals: globals.browser },
   },
+  {
+    // TanStack Router file routes conventionally export `Route` (not the component itself) and pass the
+    // component in as `{ component: RouteComponent }` — not a shape react-refresh's static analysis supports.
+    files: ['src/routes/**/*.{ts,tsx}'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
+  {
+    // shadcn-generated components conventionally export a `*Variants` cva helper alongside the component.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])

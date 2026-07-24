@@ -48,6 +48,7 @@ export const paginationSchema = z.object({
 export const linkSchema = z
   .object({
     code: codeSchema,
+    shortUrl: z.url().openapi({ example: 'https://sh.example.com/c/aZ3-1x9', description: 'full shortened URL' }),
     url: z.url().openapi({ example: 'https://example.com/some/very/long/path' }),
     redirectStatus: redirectStatusSchema.openapi({ example: 302 }),
     owner: z.string().openapi({ example: 'a1b2c3d4-...', description: 'JWT sub of the link owner' }),

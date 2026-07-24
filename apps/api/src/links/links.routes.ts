@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
 import { ADMIN_ROLE, hasRole } from '../auth'
+import env from '../env'
 import type { LinkRow } from './links.repository'
 import {
   codeParamSchema,
@@ -35,6 +36,7 @@ function isAdmin(c: Context<Env>): boolean {
 function toDto(link: LinkRow) {
   return {
     code: link.code,
+    shortUrl: `${env.PUBLIC_BASE_URL}/c/${link.code}`,
     url: link.target_url,
     redirectStatus: link.redirect_status,
     owner: link.owner,

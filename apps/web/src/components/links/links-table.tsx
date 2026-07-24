@@ -11,12 +11,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { API_URL } from '@/env'
 import type { Link } from '@/lib/links'
 import { PERMANENT_REDIRECT_STATUS } from '@/lib/links-schema'
 import { LinkStatusBadge } from './link-status-badge'
 
-function CopyCodeButton({ code }: { code: string }) {
+function CopyCodeButton({ shortUrl }: { shortUrl: string }) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -25,7 +24,7 @@ function CopyCodeButton({ code }: { code: string }) {
             variant="ghost"
             size="icon-xs"
             onClick={() => {
-              void navigator.clipboard.writeText(`${API_URL.replace(/\/+$/, '')}/c/${code}`)
+              void navigator.clipboard.writeText(shortUrl)
               toast.success('Short URL copied')
             }}
           />
@@ -70,7 +69,7 @@ export function LinksTable({
               <TableCell>
                 <div className="flex items-center gap-1">
                   <span className="font-mono text-sm">{link.code}</span>
-                  <CopyCodeButton code={link.code} />
+                  <CopyCodeButton shortUrl={link.shortUrl} />
                 </div>
               </TableCell>
               <TableCell className="max-w-xs">

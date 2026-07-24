@@ -64,11 +64,6 @@ app.use(secureHeaders())
 app.use(prettyJSON())
 app.use(registerMetrics)
 
-app.use(
-  '/auth/*',
-  jwk({ alg: ['RS256'], jwks_uri: env.JWKS_URI, verification: { aud: env.AUDIENCE, iss: env.JWK_ISSUER } }),
-)
-
 app.get('/health', c => c.text('ok'))
 
 app.get(
@@ -79,7 +74,18 @@ app.get(
   printMetrics,
 )
 
-const routes = app.route('/auth/links', managedLinks).route('/c', publicLinks)
+app.route('/c', publicLinks)
+
+// Administrative + docs routes are namespaced under /shurl/api so they can share an ingress
+// path with the frontend (served under /shurl) while /c (the public redirect) stays at the
+// root so short links resolve as `${PUBLIC_BASE_URL}/c/{code}`.
+const adminApp = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
+adminApp.use(
+  '/auth/*',
+  jwk({ alg: ['RS256'], jwks_uri: env.JWKS_URI, verification: { aud: env.AUDIENCE, iss: env.JWK_ISSUER } }),
+)
+const adminRoutes = adminApp.route('/auth/links', managedLinks)
+app.route('/shurl/api', adminRoutes)
 
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',
@@ -87,11 +93,11 @@ app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   bearerFormat: 'JWT',
 })
 
-app.doc('/openapi.json', {
+app.doc('/shurl/api/openapi.json', {
   openapi: '3.1.0',
   info: { title: 'shurl', version: '1.0.0', description: 'URL shortener API' },
 })
-app.get('/docs', swaggerUI({ url: '/openapi.json' }))
+app.get('/shurl/api/docs', swaggerUI({ url: '/shurl/api/openapi.json' }))
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) return err.getResponse()
@@ -110,6 +116,9 @@ try {
 
 logger.info('shurl ready')
 
-export type AppType = typeof routes
+// The RPC client type intentionally reflects the unprefixed adminRoutes shape (e.g.
+// `api.auth.links`) — the /shurl/api prefix lives in the client's base URL instead, so the
+// server owns the prefix without leaking it into every call site.
+export type AppType = typeof adminRoutes
 
-export default routes
+export default app

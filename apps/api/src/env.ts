@@ -12,6 +12,9 @@ const envSchema = z.object({
     .string()
     .transform(value => value.split(',').map(origin => origin.trim()))
     .pipe(z.array(z.url({ protocol: /^https?$/ }))),
+  PUBLIC_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .transform(value => value.replace(/\/+$/, '')),
 })
 
 const { data: env, error } = envSchema.safeParse(Bun.env)

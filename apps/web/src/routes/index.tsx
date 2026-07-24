@@ -14,7 +14,7 @@ function RouteComponent() {
       <p className="max-w-sm text-sm text-muted-foreground">
         Short links for your team — create, retarget, and track them in one place.
       </p>
-      <Button render={<Link to="/links">Open dashboard</Link>} />
+      <Button nativeButton={false} render={<Link to="/links">Open dashboard</Link>} />
     </div>
   )
 }

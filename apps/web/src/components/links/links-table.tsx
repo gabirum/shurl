@@ -38,12 +38,26 @@ function CopyCodeButton({ shortUrl }: { shortUrl: string }) {
   )
 }
 
+function OwnerCell({ link }: { link: Link }) {
+  const label = link.ownerUsername ?? `${link.owner.slice(0, 8)}…`
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="block max-w-32 truncate text-muted-foreground" />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{link.owner}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function LinksTable({
   links,
+  showOwner = false,
   onEdit,
   onDelete,
 }: {
   links: Link[]
+  showOwner?: boolean
   onEdit: (link: Link) => void
   onDelete: (link: Link) => void
 }) {
@@ -56,6 +70,7 @@ export function LinksTable({
           <TableHead>Code</TableHead>
           <TableHead>Destination</TableHead>
           <TableHead>Status</TableHead>
+          {showOwner && <TableHead>Owner</TableHead>}
           <TableHead className="text-right">Clicks</TableHead>
           <TableHead>Created</TableHead>
           <TableHead className="w-9" />
@@ -92,6 +107,11 @@ export function LinksTable({
               <TableCell>
                 <LinkStatusBadge status={link.redirectStatus} />
               </TableCell>
+              {showOwner && (
+                <TableCell>
+                  <OwnerCell link={link} />
+                </TableCell>
+              )}
               <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
                 {link.accessCount.toLocaleString()}
               </TableCell>

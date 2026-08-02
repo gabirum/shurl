@@ -1,11 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { ADMIN_ROLE, getRoles, hasRole } from './auth'
+import { ADMIN_ROLE, getRoles, getUsername, hasRole } from './auth'
 
 // getRoles/hasRole resolve JWT_ROLE_CLAIM (a dot-delimited path) against the payload, so build
 // test payloads from whatever path is actually configured (test/setup.ts's default, or a
 // developer's real apps/api/.env) instead of hardcoding one shape.
 function payloadWithClaim(claim: unknown): unknown {
   const segments = process.env.JWT_ROLE_CLAIM!.split('.')
+  return segments.reduceRight<unknown>((value, segment) => ({ [segment]: value }), claim)
+}
+
+// Same idea, for JWT_USERNAME_CLAIM.
+function payloadWithUsernameClaim(claim: unknown): unknown {
+  const segments = process.env.JWT_USERNAME_CLAIM!.split('.')
   return segments.reduceRight<unknown>((value, segment) => ({ [segment]: value }), claim)
 }
 
@@ -40,5 +46,30 @@ describe('hasRole', () => {
 
   test('is false when the role is absent', () => {
     expect(hasRole(payloadWithClaim(['user']), ADMIN_ROLE)).toBe(false)
+  })
+})
+
+describe('getUsername', () => {
+  test('reads a string claim nested at the configured path', () => {
+    expect(getUsername(payloadWithUsernameClaim('joao.silva'))).toBe('joao.silva')
+  })
+
+  test('returns undefined when the claim path is absent', () => {
+    expect(getUsername({})).toBeUndefined()
+    expect(getUsername(payloadWithUsernameClaim(undefined))).toBeUndefined()
+  })
+
+  test('returns undefined for a non-string claim', () => {
+    expect(getUsername(payloadWithUsernameClaim(42))).toBeUndefined()
+    expect(getUsername(payloadWithUsernameClaim(['a']))).toBeUndefined()
+  })
+
+  test('returns undefined for an empty string claim', () => {
+    expect(getUsername(payloadWithUsernameClaim(''))).toBeUndefined()
+  })
+
+  test('returns undefined for non-object payloads', () => {
+    expect(getUsername(null)).toBeUndefined()
+    expect(getUsername('not an object')).toBeUndefined()
   })
 })

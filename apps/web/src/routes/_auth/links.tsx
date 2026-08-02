@@ -16,6 +16,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useIsAdmin } from '@/lib/auth'
 import { linksApi, type Link } from '@/lib/links'
 
 export const Route = createFileRoute('/_auth/links')({ component: RouteComponent })
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/_auth/links')({ component: RouteComponent
 const PAGE_SIZE = 20
 
 function RouteComponent() {
+  const isAdmin = useIsAdmin()
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<Link | null>(null)
@@ -82,7 +84,7 @@ function RouteComponent() {
             </Empty>
           ) : (
             <>
-              <LinksTable links={query.data.data} onEdit={setEditing} onDelete={setDeleting} />
+              <LinksTable links={query.data.data} showOwner={isAdmin} onEdit={setEditing} onDelete={setDeleting} />
               {(query.data.hasPrevious || query.data.hasNext) && (
                 <Pagination>
                   <PaginationContent>

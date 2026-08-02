@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
-import { ADMIN_ROLE, hasRole } from '../auth'
+import { ADMIN_ROLE, getUsername, hasRole } from '../auth'
 import env from '../env'
 import type { LinkRow } from './links.repository'
 import {
@@ -33,6 +33,12 @@ function isAdmin(c: Context<Env>): boolean {
   return hasRole(c.get('jwtPayload'), ADMIN_ROLE)
 }
 
+// Best-effort: the username claim (JWT_USERNAME_CLAIM) is informational, unlike `sub` in
+// ownerOf, so a missing/malformed claim just means the link is stored without one.
+function usernameOf(c: Context<Env>): string | undefined {
+  return getUsername(c.get('jwtPayload'))
+}
+
 function toDto(link: LinkRow) {
   return {
     code: link.code,
@@ -40,6 +46,7 @@ function toDto(link: LinkRow) {
     url: link.target_url,
     redirectStatus: link.redirect_status,
     owner: link.owner,
+    ownerUsername: link.owner_username,
     accessCount: Number(link.access_count),
     createdAt: link.created_at.toISOString(),
     updatedAt: link.updated_at.toISOString(),
@@ -63,7 +70,7 @@ export const managedLinks = new OpenAPIHono<Env>()
     async c => {
       const owner = ownerOf(c)
       const input = c.req.valid('json')
-      const link = await linksService.create(owner, input)
+      const link = await linksService.create(owner, input, usernameOf(c))
       return c.json(toDto(link), 201)
     },
   )
@@ -112,7 +119,7 @@ export const managedLinks = new OpenAPIHono<Env>()
       path: '/{code}',
       tags,
       security,
-      summary: 'Update a link',
+      summary: 'Update a link (any owner, for admins)',
       request: {
         params: codeParamSchema,
         body: { required: true, content: { 'application/json': { schema: updateLinkSchema } } },
@@ -130,7 +137,7 @@ export const managedLinks = new OpenAPIHono<Env>()
       const owner = ownerOf(c)
       const { code } = c.req.valid('param')
       const patch = c.req.valid('json')
-      const link = await linksService.update(owner, code, patch)
+      const link = await linksService.update(owner, code, patch, isAdmin(c))
       return c.json(toDto(link), 200)
     },
   )
@@ -140,7 +147,7 @@ export const managedLinks = new OpenAPIHono<Env>()
       path: '/{code}',
       tags,
       security,
-      summary: 'Delete a link',
+      summary: 'Delete a link (any owner, for admins)',
       request: { params: codeParamSchema },
       responses: {
         204: { description: 'link removed' },
@@ -154,7 +161,7 @@ export const managedLinks = new OpenAPIHono<Env>()
     async c => {
       const owner = ownerOf(c)
       const { code } = c.req.valid('param')
-      await linksService.remove(owner, code)
+      await linksService.remove(owner, code, isAdmin(c))
       return c.body(null, 204)
     },
   )

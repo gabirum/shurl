@@ -1,0 +1,1 @@
+ALTER TABLE links ADD COLUMN owner_username VARCHAR(255) NULL;

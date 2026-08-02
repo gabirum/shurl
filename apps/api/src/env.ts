@@ -6,6 +6,7 @@ const envSchema = z.object({
   JWK_ISSUER: z.url({ protocol: /^https?$/ }),
   AUDIENCE: z.string(),
   JWT_ROLE_CLAIM: z.string(),
+  JWT_USERNAME_CLAIM: z.string().default('preferred_username'),
   DATABASE_URL: z.url({ protocol: /^mysql$/ }),
   REDIS_URL: z.url({ protocol: /^(redis|rediss|valkey)$/ }),
   CORS_ORIGIN: z

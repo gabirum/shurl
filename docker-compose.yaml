@@ -27,6 +27,7 @@ services:
       - JWK_ISSUER=http://localhost:8080/realms/shurl
       - AUDIENCE=shurl
       - JWT_ROLE_CLAIM=resource_access.shurl.roles
+      - JWT_USERNAME_CLAIM=preferred_username
     env_file:
       - apps/api/.env
     ports:

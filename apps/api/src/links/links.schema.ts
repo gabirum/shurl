@@ -52,6 +52,10 @@ export const linkSchema = z
     url: z.url().openapi({ example: 'https://example.com/some/very/long/path' }),
     redirectStatus: redirectStatusSchema.openapi({ example: 302 }),
     owner: z.string().openapi({ example: 'a1b2c3d4-...', description: 'JWT sub of the link owner' }),
+    ownerUsername: z
+      .string()
+      .nullable()
+      .openapi({ example: 'joao.silva', description: 'username of the link owner at creation time' }),
     accessCount: z.number().int().openapi({ example: 42 }),
     createdAt: z.string().openapi({ example: '2026-01-01T00:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-01-01T00:00:00.000Z' }),

@@ -35,8 +35,8 @@ export function generateCode(): string {
   return code
 }
 
-export async function create(owner: string, input: CreateLinkInput): Promise<LinkRow> {
-  const newLink = { owner, url: input.url, redirectStatus: input.redirectStatus }
+export async function create(owner: string, input: CreateLinkInput, ownerUsername?: string): Promise<LinkRow> {
+  const newLink = { owner, ownerUsername, url: input.url, redirectStatus: input.redirectStatus }
 
   if (input.code) {
     await repo.insertLink({ ...newLink, code: input.code })
@@ -88,26 +88,34 @@ export async function list(owner: string, pagination: PaginationInput, isAdmin =
 // A conditional write (with owner + 308 guards in its WHERE) reporting no rows affected is
 // ambiguous: the row may be gone, owned by someone else, or immutable. Re-read to map it to the
 // right status — 404 for missing/not-owned (never leak existence to a non-owner), 409 for 308.
-async function explainNoop(owner: string, code: string): Promise<never> {
+// `ownerScope: null` (admin) means only "gone" vs "immutable" remain possible.
+async function explainNoop(code: string, ownerScope: string | null): Promise<never> {
   const row = await repo.findByCode(code)
-  if (!row || row.owner !== owner) throw new LinkNotFoundException()
+  if (!row || (ownerScope !== null && row.owner !== ownerScope)) throw new LinkNotFoundException()
   throw new LinkImmutableException()
 }
 
-export async function update(owner: string, code: string, patch: UpdateLinkInput): Promise<LinkRow> {
-  const updated = await repo.updateLink(code, owner, { url: patch.url, redirectStatus: patch.redirectStatus })
-  if (!updated) await explainNoop(owner, code)
-  const row = await getOwned(owner, code)
-  logger.info({ owner, code, patch }, 'link updated')
+export async function update(
+  owner: string,
+  code: string,
+  patch: UpdateLinkInput,
+  isAdmin = false,
+): Promise<LinkRow> {
+  const ownerScope = isAdmin ? null : owner
+  const updated = await repo.updateLink(code, ownerScope, { url: patch.url, redirectStatus: patch.redirectStatus })
+  if (!updated) await explainNoop(code, ownerScope)
+  const row = await get(owner, code, isAdmin)
+  logger.info({ actor: owner, owner: row.owner, code, patch }, 'link updated')
   await setCachedLink(code, row)
   return row
 }
 
-export async function remove(owner: string, code: string): Promise<void> {
-  const removed = await repo.removeLink(code, owner)
-  if (!removed) await explainNoop(owner, code)
+export async function remove(owner: string, code: string, isAdmin = false): Promise<void> {
+  const ownerScope = isAdmin ? null : owner
+  const removed = await repo.removeLink(code, ownerScope)
+  if (!removed) await explainNoop(code, ownerScope)
   await invalidateLink(code)
-  logger.info({ owner, code }, 'link removed')
+  logger.info({ actor: owner, code }, 'link removed')
 }
 
 export async function resolve(code: string): Promise<LinkRow | undefined> {

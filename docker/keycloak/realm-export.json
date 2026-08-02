@@ -990,6 +990,21 @@
             "access.token.claim": "true",
             "userinfo.token.claim": "false"
           }
+        },
+        {
+          "name": "shurl client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "shurl",
+            "claim.name": "resource_access.shurl.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
         }
       ],
       "defaultClientScopes": [

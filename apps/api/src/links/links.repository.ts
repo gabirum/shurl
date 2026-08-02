@@ -7,6 +7,7 @@ export interface LinkRow {
   target_url: string
   redirect_status: 302 | 307 | 308
   owner: string
+  owner_username: string | null
   access_count: number
   created_at: Date
   updated_at: Date
@@ -21,6 +22,7 @@ export class CodeConflictException extends Exception {
 export interface NewLink {
   code: string
   owner: string
+  ownerUsername?: string
   url: string
   redirectStatus: 302 | 307 | 308
 }
@@ -28,8 +30,8 @@ export interface NewLink {
 export async function insertLink(link: NewLink): Promise<void> {
   try {
     await sql`
-      INSERT INTO links (code, target_url, redirect_status, owner)
-      VALUES (${link.code}, ${link.url}, ${link.redirectStatus}, ${link.owner})
+      INSERT INTO links (code, target_url, redirect_status, owner, owner_username)
+      VALUES (${link.code}, ${link.url}, ${link.redirectStatus}, ${link.owner}, ${link.ownerUsername ?? null})
     `
   } catch (error) {
     if (error instanceof SQL.MySQLError && error.errno === 1062) {
@@ -74,22 +76,26 @@ export interface LinkPatch {
 // request could flip a link to 308 between a prior read and this update, and it makes the function
 // safe to call without a separate ownership pre-check (a 0-row result is then disambiguated into
 // 404 vs 409 by the caller — see links.service.ts's explainNoop).
-export async function updateLink(code: string, owner: string, patch: LinkPatch): Promise<boolean> {
+//
+// `ownerScope` is `null` for admin writes — COALESCE(NULL, owner) collapses the predicate to
+// `owner = owner` (always true, the column is NOT NULL), so a single parameterized clause covers
+// both "must match this owner" and "any owner" without duplicating the three patch branches.
+export async function updateLink(code: string, ownerScope: string | null, patch: LinkPatch): Promise<boolean> {
   let result
   if (patch.url !== undefined && patch.redirectStatus !== undefined) {
     result = await sql`
       UPDATE links SET target_url = ${patch.url}, redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
-      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+      WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else if (patch.url !== undefined) {
     result = await sql`
       UPDATE links SET target_url = ${patch.url}, updated_at = CURRENT_TIMESTAMP
-      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+      WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else if (patch.redirectStatus !== undefined) {
     result = await sql`
       UPDATE links SET redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
-      WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+      WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else {
     return true
@@ -98,10 +104,12 @@ export async function updateLink(code: string, owner: string, patch: LinkPatch):
 }
 
 // Same atomicity reasoning as updateLink: the guard prevents deleting a link that became
-// immutable, or that belongs to another owner, after the caller's last read.
-export async function removeLink(code: string, owner: string): Promise<boolean> {
+// immutable, or that belongs to another owner, after the caller's last read. `ownerScope: null`
+// means "any owner" (admin), same COALESCE trick as updateLink.
+export async function removeLink(code: string, ownerScope: string | null): Promise<boolean> {
   const result = await sql`
-    DELETE FROM links WHERE code = ${code} AND owner = ${owner} AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
+    DELETE FROM links
+    WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
   `
   return result.affectedRows > 0
 }

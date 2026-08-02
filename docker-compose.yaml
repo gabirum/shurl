@@ -24,7 +24,7 @@ services:
       - DATABASE_URL=mysql://shurl:shurl@database:3306/shurl
       - REDIS_URL=redis://redis:6379
       - JWKS_URI=http://keycloak:8080/realms/shurl/protocol/openid-connect/certs
-      - JWK_ISSUER=http://keycloak:8080/realms/shurl
+      - JWK_ISSUER=http://localhost:8080/realms/shurl
       - AUDIENCE=shurl
       - JWT_ROLE_CLAIM=resource_access.shurl.roles
     env_file:
@@ -63,7 +63,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7
-    command: ['start-dev']
+    command: ['start-dev', '--import-realm']
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
       - KC_BOOTSTRAP_ADMIN_PASSWORD=admin

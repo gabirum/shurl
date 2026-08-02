@@ -127,7 +127,6 @@ Notes:
 - Tokens are short-lived (`accessTokenLifespan: 300`s in the sample realm) — cache and renew rather than fetching one per request.
 - Links created this way are owned by the service account's `sub`, not a human user.
 - The service account only holds `default-roles-shurl` by default — it can manage its own links but isn't `admin`. Grant it the `shurl` client's `admin` role to allow cross-owner reads.
-- The API rejects tokens whose `aud` doesn't match `AUDIENCE`. The `shurl` client has an audience mapper for this; `any-service` currently doesn't emit `aud: shurl` on its own, so wire up an equivalent mapper (or role-based audience resolution) before relying on this client in a real deployment.
 
 ## Deployment
 

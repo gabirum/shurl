@@ -2,17 +2,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile.dev
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./apps/api/src
-          target: /app/apps/api/src
-          initial_sync: true
-        - action: rebuild
-          path: package.json
-        - action: rebuild
-          path: apps/api/package.json
+      dockerfile: apps/api/Dockerfile
     depends_on:
       database:
         condition: service_healthy
@@ -23,14 +13,24 @@ services:
     environment:
       - DATABASE_URL=mysql://shurl:shurl@database:3306/shurl
       - REDIS_URL=redis://redis:6379
-      - JWKS_URI=http://keycloak:8080/realms/shurl/protocol/openid-connect/certs
-      - JWK_ISSUER=http://keycloak:8080/realms/shurl
-      - AUDIENCE=shurl
-      - JWT_ROLE_CLAIM=resource_access.shurl.roles
     env_file:
       - apps/api/.env
     ports:
       - 3000:3000
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - API_URL=https://api.example.com/shurl/api
+      - OIDC_ISSUER=https://sso.example.com/realms/shurl
+      - OIDC_CLIENT_ID=shurl
+    ports:
+      - 80:80
 
   redis:
     image: redis:alpine
@@ -63,14 +63,13 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7
-    command: ['start-dev']
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
       - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
     ports:
       - 8080:8080
     volumes:
-      - ./docker/keycloak:/opt/keycloak/data/import:ro
+      - ./docker/keycloak:/opt/keycloak/data/import
 
 volumes:
   db:

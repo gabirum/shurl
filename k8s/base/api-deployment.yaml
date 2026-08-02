@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shurl-api
+  labels:
+    app.kubernetes.io/name: shurl-api
+    app.kubernetes.io/part-of: shurl
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shurl-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shurl-api
+        app.kubernetes.io/part-of: shurl
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # "bun" user in the oven/bun base image (apps/api/Dockerfile)
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: ghcr.io/gabirum/shurl-api
+          ports:
+            - name: http
+              containerPort: 3000 # apps/api doesn't read a PORT env var; Bun's default export
+              #                     server defaults to 3000 (see apps/api/src/index.ts)
+          envFrom:
+            - configMapRef:
+                name: shurl-api-config
+            - secretRef:
+                name: shurl-api-secret
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          lifecycle:
+            preStop:
+              exec:
+                command: [sleep, '5']
+          # /health (apps/api/src/index.ts) is a pure liveness check — it never touches
+          # MySQL/Redis. Startup can take up to ~30s while `migrate()` holds the
+          # `shurl_migrations` named lock (apps/api/src/db.ts), so give it its own probe
+          # rather than a large initialDelaySeconds on readiness/liveness.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1250m
+              memory: 512Mi
+      # SIGTERM handling (apps/api/src/index.ts) flushes the in-memory access counter and
+      # exits immediately without draining in-flight requests — give the Service/endpoint
+      # controller time to stop routing new traffic first.
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shurl-api
+  labels:
+    app.kubernetes.io/name: shurl-api
+    app.kubernetes.io/part-of: shurl
+spec:
+  # Intentionally ClusterIP only: /metrics is IP-restricted at the app layer (allowlists
+  # loopback + RFC1918, see apps/api/src/index.ts), not token-protected, so it must never be
+  # reachable through an Ingress/Gateway — only the /shurl/api and /c paths are routed
+  # externally (see k8s/components/*).
+  selector:
+    app.kubernetes.io/name: shurl-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

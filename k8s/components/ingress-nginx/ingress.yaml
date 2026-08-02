@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shurl
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [sh.example.com]
+      secretName: shurl-tls
+  rules:
+    - host: sh.example.com
+      http:
+        paths:
+          # ingress-nginx matches the longest prefix first, so /shurl/api and /c win over /
+          # regardless of rule order — still listed most-specific-first for readability.
+          - path: /shurl/api
+            pathType: Prefix
+            backend:
+              service:
+                name: shurl-api
+                port:
+                  name: http
+          - path: /c
+            pathType: Prefix
+            backend:
+              service:
+                name: shurl-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shurl-web
+                port:
+                  name: http

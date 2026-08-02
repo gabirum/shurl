@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shurl
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# Pick the ingress flavor your cluster provides. Only one should be active — swap this for
+# ../../components/gateway-api on clusters using the Gateway API instead of ingress-nginx.
+components:
+  - ../../components/ingress-nginx
+
+configMapGenerator:
+  - name: shurl-api-config
+    envs: [api.env]
+  - name: shurl-web-config
+    envs: [web.env]
+
+# api.secret.env is gitignored — copy it from api.secret.env.example and fill in real
+# credentials before building/applying this overlay.
+secretGenerator:
+  - name: shurl-api-secret
+    envs: [api.secret.env]
+
+images:
+  - name: ghcr.io/gabirum/shurl-api
+    newTag: latest
+  - name: ghcr.io/gabirum/shurl-web
+    newTag: latest

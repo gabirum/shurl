@@ -1,3 +1,6 @@
+# kubernetes overlay secrets (copied from *.secret.env.example, filled with real values)
+k8s/overlays/*/*.secret.env
+
 # Logs
 logs
 *.log

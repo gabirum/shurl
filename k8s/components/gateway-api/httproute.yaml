@@ -1,0 +1,34 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shurl
+spec:
+  # The Gateway itself is shared cluster infrastructure and isn't managed here — point this
+  # at whatever Gateway your cluster already has, in whichever namespace it lives.
+  parentRefs:
+    - name: shurl-gateway
+      namespace: gateway
+  hostnames:
+    - sh.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shurl/api
+      backendRefs:
+        - name: shurl-api
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /c
+      backendRefs:
+        - name: shurl-api
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: shurl-web
+          port: 80

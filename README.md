@@ -130,6 +130,21 @@ Notes:
 
 ## Deployment
 
+### Container images
+
+`.github/workflows/build-images.yml` builds and publishes both production images to GHCR after `bun run lint`/`bun run test` pass:
+
+- `ghcr.io/gabirum/shurl-api` (from [apps/api/Dockerfile](apps/api/Dockerfile))
+- `ghcr.io/gabirum/shurl-web` (from [apps/web/Dockerfile](apps/web/Dockerfile))
+
+Tagging scheme:
+
+- Push to `master` → `master` and `sha-<short-sha>` (no `latest`, so this never silently redeploys production).
+- Pushed tag `vX.Y.Z` → `X.Y.Z`, `X.Y`, and `latest`. Cut a release with `git tag v1.0.0 && git push origin v1.0.0`.
+- Pull requests build both images (validates the Dockerfile) but never push.
+
+GHCR packages are created **private** by default — either make `shurl-api`/`shurl-web` public under the repo's Settings → Packages, or configure an `imagePullSecret` in the cluster, otherwise pods land in `ImagePullBackOff`.
+
 ### Single machine / Docker Swarm
 
 Use [docker-compose.prd.yaml](docker-compose.prd.yaml), which builds the production images (`apps/api/Dockerfile`, `apps/web/Dockerfile`) instead of the dev ones.

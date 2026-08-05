@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { LinkIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { DeleteLinkDialog } from '@/components/links/delete-link-dialog'
 import { LinkFormDialog } from '@/components/links/link-form-dialog'
 import { LinksTable } from '@/components/links/links-table'
@@ -17,14 +18,16 @@ import {
 } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsAdmin } from '@/lib/auth'
-import { linksApi, type Link } from '@/lib/links'
+import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
 
 export const Route = createFileRoute('/_auth/links')({ component: RouteComponent })
 
 const PAGE_SIZE = 20
 
 function RouteComponent() {
+  const { t } = useTranslation()
   const isAdmin = useIsAdmin()
+  const apiErrorMessage = useApiErrorMessage()
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<Link | null>(null)
@@ -40,11 +43,11 @@ function RouteComponent() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Links</CardTitle>
+          <CardTitle>{t('links.title')}</CardTitle>
           <CardAction>
             <Button onClick={() => setCreateOpen(true)}>
               <PlusIcon data-icon="inline-start" />
-              New link
+              {t('links.new')}
             </Button>
           </CardAction>
         </CardHeader>
@@ -60,11 +63,11 @@ function RouteComponent() {
               <EmptyMedia variant="icon">
                 <LinkIcon />
               </EmptyMedia>
-              <EmptyTitle>Couldn't load links</EmptyTitle>
-              <EmptyDescription>{query.error.message}</EmptyDescription>
+              <EmptyTitle>{t('links.loadError')}</EmptyTitle>
+              <EmptyDescription>{apiErrorMessage(query.error)}</EmptyDescription>
               <EmptyContent>
                 <Button variant="outline" onClick={() => query.refetch()}>
-                  Try again
+                  {t('common.tryAgain')}
                 </Button>
               </EmptyContent>
             </Empty>
@@ -73,12 +76,12 @@ function RouteComponent() {
               <EmptyMedia variant="icon">
                 <LinkIcon />
               </EmptyMedia>
-              <EmptyTitle>No links yet</EmptyTitle>
-              <EmptyDescription>Create your first short link to get started.</EmptyDescription>
+              <EmptyTitle>{t('links.empty.title')}</EmptyTitle>
+              <EmptyDescription>{t('links.empty.description')}</EmptyDescription>
               <EmptyContent>
                 <Button onClick={() => setCreateOpen(true)}>
                   <PlusIcon data-icon="inline-start" />
-                  New link
+                  {t('links.new')}
                 </Button>
               </EmptyContent>
             </Empty>
@@ -90,6 +93,8 @@ function RouteComponent() {
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
+                        text={t('links.pagination.previous')}
+                        aria-label={t('links.pagination.previous')}
                         aria-disabled={!query.data.hasPrevious}
                         className={!query.data.hasPrevious ? 'pointer-events-none opacity-50' : undefined}
                         onClick={e => {
@@ -101,6 +106,8 @@ function RouteComponent() {
                     </PaginationItem>
                     <PaginationItem>
                       <PaginationNext
+                        text={t('links.pagination.next')}
+                        aria-label={t('links.pagination.next')}
                         aria-disabled={!query.data.hasNext}
                         className={!query.data.hasNext ? 'pointer-events-none opacity-50' : undefined}
                         onClick={e => {

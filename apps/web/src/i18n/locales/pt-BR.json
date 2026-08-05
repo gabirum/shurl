@@ -1,0 +1,69 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "save": "Salvar",
+    "tryAgain": "Tentar novamente"
+  },
+  "landing": {
+    "tagline": "Links curtos para o seu time — crie, redirecione e acompanhe tudo em um só lugar.",
+    "openDashboard": "Abrir painel"
+  },
+  "header": { "logout": "Sair", "language": "Idioma" },
+  "links": {
+    "title": "Links",
+    "new": "Novo link",
+    "loadError": "Não foi possível carregar os links",
+    "empty": { "title": "Nenhum link ainda", "description": "Crie seu primeiro link curto para começar." },
+    "copy": "Copiar URL curta",
+    "copied": "URL curta copiada",
+    "table": {
+      "code": "Código",
+      "destination": "Destino",
+      "status": "Status",
+      "owner": "Proprietário",
+      "clicks": "Cliques",
+      "created": "Criado em",
+      "actions": "Ações para {{code}}"
+    },
+    "pagination": { "previous": "Anterior", "next": "Próxima" }
+  },
+  "linkForm": {
+    "createTitle": "Novo link",
+    "editTitle": "Editar {{code}}",
+    "createDescription": "Aponte um código curto para uma URL de destino.",
+    "editDescription": "Altere o destino ou o tipo de redirecionamento.",
+    "urlLabel": "URL de destino",
+    "urlPlaceholder": "https://exemplo.com/algum/caminho",
+    "aliasLabel": "Alias personalizado (opcional)",
+    "aliasPlaceholder": "meu-link",
+    "aliasHelp": "Letras, números, - e _. Um código aleatório é gerado se deixado em branco.",
+    "statusLabel": "Tipo de redirecionamento",
+    "statusHelp": "Links permanentes (308) nunca podem ser editados ou excluídos depois — escolha com cuidado.",
+    "submitCreate": "Criar link",
+    "submitEdit": "Salvar alterações",
+    "createdToast": "Link criado",
+    "updatedToast": "Link atualizado",
+    "redirectStatus": {
+      "302": "302 · Temporário (Found)",
+      "307": "307 · Temporário (preserva o método)",
+      "308": "308 · Permanente (imutável)"
+    }
+  },
+  "deleteLink": {
+    "title": "Excluir {{code}}?",
+    "description": "Este link curto deixará de redirecionar imediatamente. Esta ação não pode ser desfeita.",
+    "deletedToast": "{{code}} excluído",
+    "errorToast": "Falha ao excluir o link"
+  },
+  "status": { "permanentTooltip": "Redirecionamento permanente — não pode ser editado ou excluído" },
+  "errors": {
+    "E_NOT_FOUND": "Link não encontrado",
+    "E_CODE_CONFLICT": "Esse alias já está em uso",
+    "E_LINK_IMMUTABLE": "Links permanentes não podem ser modificados",
+    "E_CODE_GENERATION": "Falha ao gerar um código único — tente novamente",
+    "E_INTERNAL": "Erro interno do servidor",
+    "unknown": "Algo deu errado"
+  }
+}

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,8 +15,8 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { LinkApiError, linksApi, type Link } from '@/lib/links'
-import { REDIRECT_STATUSES, REDIRECT_STATUS_LABELS, type RedirectStatus } from '@/lib/links-schema'
+import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
+import { REDIRECT_STATUSES, type RedirectStatus } from '@/lib/links-schema'
 
 type LinkFormDialogProps =
   | { mode: 'create'; open: boolean; onOpenChange: (open: boolean) => void; link?: undefined }
@@ -23,7 +24,9 @@ type LinkFormDialogProps =
 
 export function LinkFormDialog(props: LinkFormDialogProps) {
   const { mode, open, onOpenChange } = props
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const apiErrorMessage = useApiErrorMessage()
 
   const [url, setUrl] = useState(props.link?.url ?? '')
   const [code, setCode] = useState('')
@@ -44,12 +47,12 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
         : linksApi.update(props.link.code, { url, redirectStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
-      toast.success(mode === 'create' ? 'Link created' : 'Link updated')
+      toast.success(mode === 'create' ? t('linkForm.createdToast') : t('linkForm.updatedToast'))
       onOpenChange(false)
       reset()
     },
     onError: (err: unknown) => {
-      setError(err instanceof LinkApiError ? err.message : 'Something went wrong')
+      setError(apiErrorMessage(err))
     },
   })
 
@@ -63,11 +66,11 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'New link' : `Edit ${props.link.code}`}</DialogTitle>
+          <DialogTitle>
+            {mode === 'create' ? t('linkForm.createTitle') : t('linkForm.editTitle', { code: props.link.code })}
+          </DialogTitle>
           <DialogDescription>
-            {mode === 'create'
-              ? 'Point a short code at a destination URL.'
-              : 'Change the destination or how it redirects.'}
+            {mode === 'create' ? t('linkForm.createDescription') : t('linkForm.editDescription')}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -80,12 +83,12 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
         >
           <FieldGroup>
             <Field data-invalid={!!error}>
-              <FieldLabel htmlFor="link-url">Destination URL</FieldLabel>
+              <FieldLabel htmlFor="link-url">{t('linkForm.urlLabel')}</FieldLabel>
               <Input
                 id="link-url"
                 type="url"
                 required
-                placeholder="https://example.com/some/path"
+                placeholder={t('linkForm.urlPlaceholder')}
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 aria-invalid={!!error}
@@ -93,21 +96,19 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
             </Field>
             {mode === 'create' && (
               <Field>
-                <FieldLabel htmlFor="link-code">Custom alias (optional)</FieldLabel>
+                <FieldLabel htmlFor="link-code">{t('linkForm.aliasLabel')}</FieldLabel>
                 <Input
                   id="link-code"
-                  placeholder="my-link"
+                  placeholder={t('linkForm.aliasPlaceholder')}
                   pattern="[A-Za-z0-9_-]{1,32}"
                   value={code}
                   onChange={e => setCode(e.target.value)}
                 />
-                <FieldDescription>
-                  Letters, numbers, - and _. A random code is generated if left blank.
-                </FieldDescription>
+                <FieldDescription>{t('linkForm.aliasHelp')}</FieldDescription>
               </Field>
             )}
             <Field>
-              <FieldLabel htmlFor="link-status">Redirect type</FieldLabel>
+              <FieldLabel htmlFor="link-status">{t('linkForm.statusLabel')}</FieldLabel>
               <Select
                 value={String(redirectStatus)}
                 onValueChange={value => setRedirectStatus(Number(value) as RedirectStatus)}
@@ -118,25 +119,23 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
                 <SelectContent>
                   {REDIRECT_STATUSES.map(status => (
                     <SelectItem key={status} value={String(status)}>
-                      {REDIRECT_STATUS_LABELS[status]}
+                      {t(`linkForm.redirectStatus.${status}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <FieldDescription>
-                Permanent (308) links can never be edited or deleted afterward — choose it deliberately.
-              </FieldDescription>
+              <FieldDescription>{t('linkForm.statusHelp')}</FieldDescription>
             </Field>
             {error && <FieldError>{error}</FieldError>}
           </FieldGroup>
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form="link-form" disabled={mutation.isPending}>
             {mutation.isPending && <Spinner data-icon="inline-start" />}
-            {mode === 'create' ? 'Create link' : 'Save changes'}
+            {mode === 'create' ? t('linkForm.submitCreate') : t('linkForm.submitEdit')}
           </Button>
         </DialogFooter>
       </DialogContent>

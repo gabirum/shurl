@@ -1,6 +1,7 @@
 import { oidcSpa } from 'oidc-spa/react-spa'
 import { z } from 'zod'
 import { OIDC_CLIENT_ID, OIDC_ISSUER } from './env'
+import i18n from './i18n'
 
 export const { bootstrapOidc, useOidc, getOidc, enforceLogin, OidcInitializationGate, withLoginEnforced } = oidcSpa
   .withExpectedDecodedIdTokenShape({
@@ -23,5 +24,12 @@ export const { bootstrapOidc, useOidc, getOidc, enforceLogin, OidcInitialization
 bootstrapOidc(
   import.meta.env.VITE_OIDC_USE_MOCK === 'true'
     ? { implementation: 'mock', isUserInitiallyLoggedIn: true }
-    : { implementation: 'real', clientId: OIDC_CLIENT_ID, issuerUri: OIDC_ISSUER },
+    : {
+        implementation: 'real',
+        clientId: OIDC_CLIENT_ID,
+        issuerUri: OIDC_ISSUER,
+        // Follow the app's selected language on the Keycloak login page. Omitted for silent
+        // (iframe) sign-in, where UI query params like this one are meaningless.
+        extraQueryParams: ({ isSilent }) => (isSilent ? {} : { ui_locales: i18n.language }),
+      },
 )

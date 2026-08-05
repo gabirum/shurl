@@ -1,9 +1,12 @@
 import { Lock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PERMANENT_REDIRECT_STATUS, type RedirectStatus } from '@/lib/links-schema'
 
 export function LinkStatusBadge({ status }: { status: RedirectStatus }) {
+  const { t } = useTranslation()
+
   if (status === PERMANENT_REDIRECT_STATUS) {
     return (
       <Tooltip>
@@ -11,7 +14,7 @@ export function LinkStatusBadge({ status }: { status: RedirectStatus }) {
           <Lock data-icon="inline-start" />
           {status}
         </TooltipTrigger>
-        <TooltipContent>Permanent redirect — cannot be edited or deleted</TooltipContent>
+        <TooltipContent>{t('status.permanentTooltip')}</TooltipContent>
       </Tooltip>
     )
   }

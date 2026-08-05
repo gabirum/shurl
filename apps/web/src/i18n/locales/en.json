@@ -1,0 +1,63 @@
+{
+  "common": { "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "save": "Save", "tryAgain": "Try again" },
+  "landing": {
+    "tagline": "Short links for your team — create, retarget, and track them in one place.",
+    "openDashboard": "Open dashboard"
+  },
+  "header": { "logout": "Log out", "language": "Language" },
+  "links": {
+    "title": "Links",
+    "new": "New link",
+    "loadError": "Couldn't load links",
+    "empty": { "title": "No links yet", "description": "Create your first short link to get started." },
+    "copy": "Copy short URL",
+    "copied": "Short URL copied",
+    "table": {
+      "code": "Code",
+      "destination": "Destination",
+      "status": "Status",
+      "owner": "Owner",
+      "clicks": "Clicks",
+      "created": "Created",
+      "actions": "Actions for {{code}}"
+    },
+    "pagination": { "previous": "Previous", "next": "Next" }
+  },
+  "linkForm": {
+    "createTitle": "New link",
+    "editTitle": "Edit {{code}}",
+    "createDescription": "Point a short code at a destination URL.",
+    "editDescription": "Change the destination or how it redirects.",
+    "urlLabel": "Destination URL",
+    "urlPlaceholder": "https://example.com/some/path",
+    "aliasLabel": "Custom alias (optional)",
+    "aliasPlaceholder": "my-link",
+    "aliasHelp": "Letters, numbers, - and _. A random code is generated if left blank.",
+    "statusLabel": "Redirect type",
+    "statusHelp": "Permanent (308) links can never be edited or deleted afterward — choose it deliberately.",
+    "submitCreate": "Create link",
+    "submitEdit": "Save changes",
+    "createdToast": "Link created",
+    "updatedToast": "Link updated",
+    "redirectStatus": {
+      "302": "302 · Temporary (Found)",
+      "307": "307 · Temporary (method preserved)",
+      "308": "308 · Permanent (immutable)"
+    }
+  },
+  "deleteLink": {
+    "title": "Delete {{code}}?",
+    "description": "This short link will stop redirecting immediately. This action cannot be undone.",
+    "deletedToast": "Deleted {{code}}",
+    "errorToast": "Failed to delete link"
+  },
+  "status": { "permanentTooltip": "Permanent redirect — cannot be edited or deleted" },
+  "errors": {
+    "E_NOT_FOUND": "Link not found",
+    "E_CODE_CONFLICT": "That alias is already in use",
+    "E_LINK_IMMUTABLE": "Permanent links cannot be modified",
+    "E_CODE_GENERATION": "Failed to generate a unique code — please try again",
+    "E_INTERNAL": "Internal server error",
+    "unknown": "Something went wrong"
+  }
+}

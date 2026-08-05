@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CopyIcon, MoreHorizontalIcon, PencilIcon, TrashIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +17,8 @@ import { PERMANENT_REDIRECT_STATUS } from '@/lib/links-schema'
 import { LinkStatusBadge } from './link-status-badge'
 
 function CopyCodeButton({ shortUrl }: { shortUrl: string }) {
+  const { t } = useTranslation()
+
   return (
     <Tooltip>
       <TooltipTrigger
@@ -25,15 +28,15 @@ function CopyCodeButton({ shortUrl }: { shortUrl: string }) {
             size="icon-xs"
             onClick={() => {
               void navigator.clipboard.writeText(shortUrl)
-              toast.success('Short URL copied')
+              toast.success(t('links.copied'))
             }}
           />
         }
       >
         <CopyIcon />
-        <span className="sr-only">Copy short URL</span>
+        <span className="sr-only">{t('links.copy')}</span>
       </TooltipTrigger>
-      <TooltipContent>Copy short URL</TooltipContent>
+      <TooltipContent>{t('links.copy')}</TooltipContent>
     </Tooltip>
   )
 }
@@ -61,18 +64,19 @@ export function LinksTable({
   onEdit: (link: Link) => void
   onDelete: (link: Link) => void
 }) {
+  const { t, i18n } = useTranslation()
   const [openMenuCode, setOpenMenuCode] = useState<string | null>(null)
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Code</TableHead>
-          <TableHead>Destination</TableHead>
-          <TableHead>Status</TableHead>
-          {showOwner && <TableHead>Owner</TableHead>}
-          <TableHead className="text-right">Clicks</TableHead>
-          <TableHead>Created</TableHead>
+          <TableHead>{t('links.table.code')}</TableHead>
+          <TableHead>{t('links.table.destination')}</TableHead>
+          <TableHead>{t('links.table.status')}</TableHead>
+          {showOwner && <TableHead>{t('links.table.owner')}</TableHead>}
+          <TableHead className="text-right">{t('links.table.clicks')}</TableHead>
+          <TableHead>{t('links.table.created')}</TableHead>
           <TableHead className="w-9" />
         </TableRow>
       </TableHeader>
@@ -113,9 +117,11 @@ export function LinksTable({
                 </TableCell>
               )}
               <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                {link.accessCount.toLocaleString()}
+                {link.accessCount.toLocaleString(i18n.language)}
               </TableCell>
-              <TableCell className="text-muted-foreground">{new Date(link.createdAt).toLocaleDateString()}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {new Date(link.createdAt).toLocaleDateString(i18n.language)}
+              </TableCell>
               <TableCell>
                 <DropdownMenu
                   open={openMenuCode === link.code}
@@ -125,7 +131,7 @@ export function LinksTable({
                     render={
                       <Button variant="ghost" size="icon-sm">
                         <MoreHorizontalIcon />
-                        <span className="sr-only">Actions for {link.code}</span>
+                        <span className="sr-only">{t('links.table.actions', { code: link.code })}</span>
                       </Button>
                     }
                   />
@@ -139,7 +145,7 @@ export function LinksTable({
                         }}
                       >
                         <PencilIcon data-icon="inline-start" />
-                        Edit
+                        {t('common.edit')}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         variant="destructive"
@@ -150,7 +156,7 @@ export function LinksTable({
                         }}
                       >
                         <TrashIcon data-icon="inline-start" />
-                        Delete
+                        {t('common.delete')}
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </DropdownMenuContent>

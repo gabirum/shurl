@@ -99,7 +99,7 @@ Read from `window.RUNTIME_ENV` first (container runtime injection — see Deploy
 
 ### End users (SPA)
 
-The frontend authenticates via the public, PKCE-only `shurl` client. Any authenticated user can create/manage their own links; the `admin` client role only grants read access across all owners (`GET /shurl/api/auth/links` and `GET /shurl/api/auth/links/{code}`) — there's no admin write/delete-any-link capability.
+The frontend authenticates via the public, PKCE-only `shurl` client. Any authenticated user can create/manage their own links; the `admin` client role only grants read access across all owners (`GET /shurl/api/auth/links` and `GET /shurl/api/auth/links/{code}`).
 
 ### Machine-to-machine (OAuth2 client credentials)
 
@@ -142,8 +142,6 @@ Tagging scheme:
 - Push to `master` → `master` and `sha-<short-sha>` (no `latest`, so this never silently redeploys production).
 - Pushed tag `vX.Y.Z` → `X.Y.Z`, `X.Y`, and `latest`. Cut a release with `git tag v1.0.0 && git push origin v1.0.0`.
 - Pull requests build both images (validates the Dockerfile) but never push.
-
-GHCR packages are created **private** by default — either make `shurl-api`/`shurl-web` public under the repo's Settings → Packages, or configure an `imagePullSecret` in the cluster, otherwise pods land in `ImagePullBackOff`.
 
 ### Single machine / Docker Swarm
 

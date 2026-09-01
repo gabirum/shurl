@@ -10,6 +10,12 @@ export const codeSchema = z
 
 export const codeParamSchema = z.object({ code: codeSchema })
 
+// Reserved because they're real routes at the API root, where the public redirect now lives
+// (see apps/api/src/index.ts): a link with one of these codes would be shadowed by the route
+// and could never resolve. Compared case-insensitively, since link codes are looked up with
+// MySQL's default case-insensitive collation.
+export const RESERVED_CODES = new Set(['health', 'metrics', 'shurl', 'docs', 'api'])
+
 // `.openapi({ enum })` works around @asteasolutions/zod-to-openapi only emitting the first
 // value of a multi-value z.literal() (it otherwise renders `enum: [302]` instead of all three).
 const redirectStatusSchema = z.literal(REDIRECT_STATUSES).openapi({ enum: REDIRECT_STATUSES as unknown as number[] })
@@ -26,7 +32,12 @@ export const createLinkSchema = z
       example: 302,
       description: '302/307 are temporary, 308 makes the link permanently immutable',
     }),
-    code: codeSchema.optional().openapi({ description: 'custom alias; a random code is generated if omitted' }),
+    code: codeSchema
+      .optional()
+      .refine(code => code === undefined || !RESERVED_CODES.has(code.toLowerCase()), {
+        message: `code must not be one of the reserved values: ${[...RESERVED_CODES].join(', ')}`,
+      })
+      .openapi({ description: 'custom alias; a random code is generated if omitted' }),
   })
   .openapi('CreateLinkInput')
 
@@ -48,7 +59,7 @@ export const paginationSchema = z.object({
 export const linkSchema = z
   .object({
     code: codeSchema,
-    shortUrl: z.url().openapi({ example: 'https://sh.example.com/c/aZ3-1x9', description: 'full shortened URL' }),
+    shortUrl: z.url().openapi({ example: 'https://sh.example.com/aZ3-1x9', description: 'full shortened URL' }),
     url: z.url().openapi({ example: 'https://example.com/some/very/long/path' }),
     redirectStatus: redirectStatusSchema.openapi({ example: 302 }),
     owner: z.string().openapi({ example: 'a1b2c3d4-...', description: 'JWT sub of the link owner' }),

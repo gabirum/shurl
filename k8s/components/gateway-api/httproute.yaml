@@ -11,6 +11,12 @@ spec:
   hostnames:
     - sh.example.com
   rules:
+    # The public redirect (apps/api/src/links/links.routes.ts's publicLinks, GET /{code}) is
+    # mounted at the API's root, so it's the catch-all for this host: any one-segment path
+    # that isn't one of the Exact matches below is a short code and goes to the api. The
+    # Gateway API spec ranks Exact matches ahead of PathPrefix regardless of rule order, so /,
+    # /health, and /metrics below are safe even though the api's PathPrefix "/" rule is listed
+    # last.
     - matches:
         - path:
             type: PathPrefix
@@ -21,14 +27,41 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /c
+            value: /shurl
       backendRefs:
-        - name: shurl-api
+        - name: shurl-web
+          port: 80
+    # / (exact) is the SPA's own root redirect (apps/web/default.conf: 302 -> /shurl/), not a
+    # short code.
+    - matches:
+        - path:
+            type: Exact
+            value: /
+      backendRefs:
+        - name: shurl-web
+          port: 80
+    # /health and /metrics are also real short-code shapes; keep them on the web container's
+    # probe/placeholder handlers rather than letting the api's root catch-all take them. The
+    # api's own /metrics stays IP-restricted and is scraped in-cluster, never through this
+    # route (see k8s/base/api-service.yaml).
+    - matches:
+        - path:
+            type: Exact
+            value: /health
+      backendRefs:
+        - name: shurl-web
+          port: 80
+    - matches:
+        - path:
+            type: Exact
+            value: /metrics
+      backendRefs:
+        - name: shurl-web
           port: 80
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: shurl-web
+        - name: shurl-api
           port: 80

@@ -74,11 +74,9 @@ app.get(
   printMetrics,
 )
 
-app.route('/c', publicLinks)
-
 // Administrative + docs routes are namespaced under /shurl/api so they can share an ingress
-// path with the frontend (served under /shurl) while /c (the public redirect) stays at the
-// root so short links resolve as `${PUBLIC_BASE_URL}/c/{code}`.
+// path with the frontend (served under /shurl) while the public redirect stays at the
+// root so short links resolve as `${PUBLIC_BASE_URL}/{code}`.
 const adminApp = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
 adminApp.use(
   '/auth/*',
@@ -98,6 +96,12 @@ app.doc('/shurl/api/openapi.json', {
   info: { title: 'shurl', version: '1.0.0', description: 'URL shortener API' },
 })
 app.get('/shurl/api/docs', swaggerUI({ url: '/shurl/api/openapi.json' }))
+
+// publicLinks (GET /{code}) is registered last and mounted at the root: it's a one-segment
+// wildcard, so it must come after every other route or it would shadow /health, /metrics, and
+// /shurl/api/* instead of falling through to them. RESERVED_CODES (links.schema.ts) keeps
+// those exact segments from ever being issued as short codes in the first place.
+app.route('/', publicLinks)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) return err.getResponse()

@@ -3,6 +3,7 @@ import { recordHit } from './links.counter'
 import type { LinkRow } from './links.repository'
 import * as repo from './links.repository'
 import type { CreateLinkInput, PaginationInput, UpdateLinkInput } from './links.schema'
+import { RESERVED_CODES } from './links.schema'
 import type { Page } from '../util'
 import { createPage, Exception } from '../util'
 import { logger } from '../logger'
@@ -28,10 +29,16 @@ export const CODE_LENGTH = 7
 const MAX_GENERATION_ATTEMPTS = 5
 
 export function generateCode(): string {
-  const bytes = new Uint8Array(CODE_LENGTH)
-  crypto.getRandomValues(bytes)
-  let code = ''
-  for (const byte of bytes) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
+  let code: string
+  do {
+    const bytes = new Uint8Array(CODE_LENGTH)
+    crypto.getRandomValues(bytes)
+    code = ''
+    for (const byte of bytes) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
+    // Reserved codes (links.schema.ts) are real routes at the API root now that the redirect
+    // lives there — vanishingly unlikely to roll one at random, but re-roll rather than issue
+    // an unreachable link.
+  } while (RESERVED_CODES.has(code.toLowerCase()))
   return code
 }
 

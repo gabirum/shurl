@@ -13,18 +13,18 @@ This application has dependencies on other services:
 
 Bun workspaces monorepo with two apps: `apps/api` (`@shurl/api`, Hono backend) and `apps/web` (`@shurl/web`, React frontend). See [CLAUDE.md](CLAUDE.md) for the full internals (package-by-feature layout, caching, error handling, etc). The part that matters for deploying it is the route surface, since it drives ingress/proxy config:
 
-| Path                      | Owner   | Notes                                                                                                       |
-| ------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `/c/:code`                | api     | Public redirect, kept at the root so short links stay short.                                                |
-| `/shurl/api/auth/links*`  | api     | Link CRUD, requires a JWT (`Authorization: Bearer`).                                                        |
-| `/shurl/api/docs`         | api     | Swagger UI.                                                                                                 |
-| `/shurl/api/openapi.json` | api     | OpenAPI document.                                                                                           |
-| `/health`                 | api/web | Liveness only — doesn't check MySQL/Redis.                                                                  |
-| `/metrics`                | api     | Prometheus metrics, **IP-restricted** (loopback/private ranges) — never expose it through a public ingress. |
-| `/shurl`                  | web     | The SPA itself (Vite `base: /shurl/` in production builds).                                                 |
-| `/`                       | web     | Redirects to `/shurl`.                                                                                      |
+| Path                      | Owner   | Notes                                                                                                                        |
+| ------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `/:code`                  | api     | Public redirect, at the root so short links stay short. It's the api's catch-all — any one-segment path not listed below.    |
+| `/shurl/api/auth/links*`  | api     | Link CRUD, requires a JWT (`Authorization: Bearer`).                                                                          |
+| `/shurl/api/docs`         | api     | Swagger UI.                                                                                                                   |
+| `/shurl/api/openapi.json` | api     | OpenAPI document.                                                                                                             |
+| `/health`                 | api/web | Liveness only — doesn't check MySQL/Redis. In-cluster probes hit the api pod directly; publicly it must be routed to the web app instead, or it'd be swallowed by the api's `/:code` catch-all. |
+| `/metrics`                | api/web | Prometheus metrics, **IP-restricted** (loopback/private ranges) at the app layer — that alone doesn't stop a request arriving through a proxy, so it must also be routed to the web app publicly (same reasoning as `/health`) and scraped only in-cluster. |
+| `/shurl`                  | web     | The SPA itself (Vite `base: /shurl/` in production builds).                                                                   |
+| `/` (exact)               | web     | Redirects to `/shurl`.                                                                                                        |
 
-Because `/shurl/api` (api) and `/shurl` (web) share a prefix, whatever reverse proxy sits in front must route the longer, more specific path to the api and everything else to the web app — both the sample Ingress and HTTPRoute in [k8s](k8s) do this.
+Because `/shurl/api` (api) and `/shurl` (web) share a prefix, and the api's redirect route now claims the bare root, the reverse proxy in front must route the longer, more specific paths first (`/shurl/api`, `/shurl`), then the exact-match root paths (`/`, `/health`, `/metrics`) to the web app, and only then fall through everything else at `/` to the api — both the sample Ingress and HTTPRoute in [k8s](k8s) do this.
 
 ## Development
 
@@ -82,7 +82,7 @@ bun run --filter @shurl/web dev
 | `DATABASE_URL`    | Must be a `mysql://` URL.                                                                                                                                 |
 | `REDIS_URL`       | `redis://`, `rediss://`, or `valkey://`.                                                                                                                  |
 | `CORS_ORIGIN`     | Comma-separated list of allowed origins.                                                                                                                  |
-| `PUBLIC_BASE_URL` | Public origin serving `/c` — used to build each link's full `shortUrl`.                                                                                   |
+| `PUBLIC_BASE_URL` | Public origin serving the redirect route at the root — used to build each link's full `shortUrl`.                                                        |
 
 ### `apps/web` (`apps/web/.env.local` for local dev; see `apps/web/src/env.ts`)
 

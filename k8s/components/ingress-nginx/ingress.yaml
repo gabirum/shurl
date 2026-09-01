@@ -13,8 +13,13 @@ spec:
     - host: sh.example.com
       http:
         paths:
-          # ingress-nginx matches the longest prefix first, so /shurl/api and /c win over /
-          # regardless of rule order — still listed most-specific-first for readability.
+          # The public redirect (apps/api/src/links/links.routes.ts's publicLinks, GET /{code})
+          # is mounted at the API's root, so it's the catch-all for this host: any one-segment
+          # path that isn't one of the exact routes below is a short code and goes to the api.
+          # ingress-nginx evaluates Exact before Prefix, and among Prefix matches the longest
+          # wins — so /shurl/api and /shurl are safe ahead of the root Prefix rule regardless
+          # of order, but Exact rules must exist for /, /health, and /metrics or they'd be
+          # swallowed by the api's root Prefix rule (a code param matches any of those strings).
           - path: /shurl/api
             pathType: Prefix
             backend:
@@ -22,17 +27,44 @@ spec:
                 name: shurl-api
                 port:
                   name: http
-          - path: /c
+          - path: /shurl
             pathType: Prefix
             backend:
               service:
-                name: shurl-api
+                name: shurl-web
+                port:
+                  name: http
+          # / (exact) is the SPA's own root redirect (apps/web/default.conf: 302 -> /shurl/),
+          # not a short code.
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: shurl-web
+                port:
+                  name: http
+          # /health and /metrics are also real short-code shapes; keep them on the web
+          # container's probe/placeholder handlers rather than letting the api's root catch-all
+          # take them. The api's own /metrics stays IP-restricted and is scraped in-cluster,
+          # never through this ingress (see k8s/base/api-service.yaml).
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: shurl-web
+                port:
+                  name: http
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: shurl-web
                 port:
                   name: http
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: shurl-web
+                name: shurl-api
                 port:
                   name: http

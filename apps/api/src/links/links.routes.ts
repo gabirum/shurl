@@ -42,7 +42,7 @@ function usernameOf(c: Context<Env>): string | undefined {
 function toDto(link: LinkRow) {
   return {
     code: link.code,
-    shortUrl: `${env.PUBLIC_BASE_URL}/c/${link.code}`,
+    shortUrl: `${env.PUBLIC_BASE_URL}/${link.code}`,
     url: link.target_url,
     redirectStatus: link.redirect_status,
     owner: link.owner,

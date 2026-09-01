@@ -7,9 +7,12 @@ metadata:
     app.kubernetes.io/part-of: shurl
 spec:
   # Intentionally ClusterIP only: /metrics is IP-restricted at the app layer (allowlists
-  # loopback + RFC1918, see apps/api/src/index.ts), not token-protected, so it must never be
-  # reachable through an Ingress/Gateway — only the /shurl/api and /c paths are routed
-  # externally (see k8s/components/*).
+  # loopback + RFC1918, see apps/api/src/index.ts), not token-protected — that allowlist alone
+  # doesn't protect it behind a proxy, since the connection's source IP there is the proxy's
+  # own (private) IP, not the client's. The public redirect is mounted at the api's root
+  # (apps/api/src/index.ts), so it's this Service's catch-all too; /metrics is only kept off
+  # the public ingress by a dedicated exact-path rule diverting it to shurl-web instead
+  # (see k8s/components/*) — never rely on the app-layer allowlist alone here.
   selector:
     app.kubernetes.io/name: shurl-api
   ports:

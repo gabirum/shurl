@@ -48,12 +48,14 @@ app.use(requestId())
 app.use(async (c, next) => {
   const start = performance.now()
   await next()
+  const end = performance.now()
+
   const fields = {
     requestId: c.get('requestId'),
     method: c.req.method,
     path: c.req.path,
     status: c.res.status,
-    durationMs: Math.round(performance.now() - start),
+    durationMs: Math.round(end - start),
   }
   if (c.res.status >= 500) logger.error(fields, 'request completed')
   else if (c.res.status >= 400) logger.warn(fields, 'request completed')

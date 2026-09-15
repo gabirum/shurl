@@ -1,6 +1,7 @@
-import { sql, SQL } from 'bun'
-import { PERMANENT_REDIRECT_STATUS } from './links.schema'
+import { SQL } from 'bun'
+import { db } from '../db/client'
 import { Exception } from '../util'
+import { PERMANENT_REDIRECT_STATUS } from './links.schema'
 
 export interface LinkRow {
   code: string
@@ -29,7 +30,7 @@ export interface NewLink {
 
 export async function insertLink(link: NewLink): Promise<void> {
   try {
-    await sql`
+    await db`
       INSERT INTO links (code, target_url, redirect_status, owner, owner_username)
       VALUES (${link.code}, ${link.url}, ${link.redirectStatus}, ${link.owner}, ${link.ownerUsername ?? null})
     `
@@ -42,27 +43,27 @@ export async function insertLink(link: NewLink): Promise<void> {
 }
 
 export async function findByCode(code: string): Promise<LinkRow | undefined> {
-  const [link] = await sql<[LinkRow]>`SELECT * FROM links WHERE code = ${code} LIMIT 1`
+  const [link] = await db<[LinkRow]>`SELECT * FROM links WHERE code = ${code} LIMIT 1`
   return link
 }
 
 export async function listByOwner(owner: string, offset: number, limit: number): Promise<LinkRow[]> {
-  return sql<LinkRow[]>`
+  return db<LinkRow[]>`
     SELECT * FROM links WHERE owner = ${owner} ORDER BY created_at DESC, code DESC LIMIT ${limit} OFFSET ${offset}
   `
 }
 
 export async function countByOwner(owner: string): Promise<number> {
-  const [row] = await sql<[{ count: number }]>`SELECT COUNT(*) AS count FROM links WHERE owner = ${owner}`
+  const [row] = await db<[{ count: number }]>`SELECT COUNT(*) AS count FROM links WHERE owner = ${owner}`
   return Number(row.count)
 }
 
 export async function listAll(offset: number, limit: number): Promise<LinkRow[]> {
-  return sql<LinkRow[]>`SELECT * FROM links ORDER BY created_at DESC, code DESC LIMIT ${limit} OFFSET ${offset}`
+  return db<LinkRow[]>`SELECT * FROM links ORDER BY created_at DESC, code DESC LIMIT ${limit} OFFSET ${offset}`
 }
 
 export async function countAll(): Promise<number> {
-  const [row] = await sql<[{ count: number }]>`SELECT COUNT(*) AS count FROM links`
+  const [row] = await db<[{ count: number }]>`SELECT COUNT(*) AS count FROM links`
   return Number(row.count)
 }
 
@@ -83,17 +84,17 @@ export interface LinkPatch {
 export async function updateLink(code: string, ownerScope: string | null, patch: LinkPatch): Promise<boolean> {
   let result
   if (patch.url !== undefined && patch.redirectStatus !== undefined) {
-    result = await sql`
+    result = await db`
       UPDATE links SET target_url = ${patch.url}, redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
       WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else if (patch.url !== undefined) {
-    result = await sql`
+    result = await db`
       UPDATE links SET target_url = ${patch.url}, updated_at = CURRENT_TIMESTAMP
       WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
   } else if (patch.redirectStatus !== undefined) {
-    result = await sql`
+    result = await db`
       UPDATE links SET redirect_status = ${patch.redirectStatus}, updated_at = CURRENT_TIMESTAMP
       WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
     `
@@ -107,7 +108,7 @@ export async function updateLink(code: string, ownerScope: string | null, patch:
 // immutable, or that belongs to another owner, after the caller's last read. `ownerScope: null`
 // means "any owner" (admin), same COALESCE trick as updateLink.
 export async function removeLink(code: string, ownerScope: string | null): Promise<boolean> {
-  const result = await sql`
+  const result = await db`
     DELETE FROM links
     WHERE code = ${code} AND owner = COALESCE(${ownerScope}, owner) AND redirect_status <> ${PERMANENT_REDIRECT_STATUS}
   `
@@ -116,7 +117,7 @@ export async function removeLink(code: string, ownerScope: string | null): Promi
 
 export async function bumpAccessCounts(hits: Map<string, number>): Promise<void> {
   if (hits.size === 0) return
-  await sql.begin(async tx => {
+  await db.begin(async tx => {
     for (const [code, count] of hits) {
       await tx`UPDATE links SET access_count = access_count + ${count} WHERE code = ${code}`
     }

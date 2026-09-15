@@ -1,5 +1,6 @@
-import { Glob, sql } from 'bun'
+import { Glob } from 'bun'
 import { logger } from './logger'
+import { db } from './db/client'
 
 const migrationsDir = `${import.meta.dir}/db/migrations`
 
@@ -12,7 +13,7 @@ const MIGRATION_LOCK_TIMEOUT_SECONDS = 30
 export async function migrate() {
   // GET_LOCK/RELEASE_LOCK are session-scoped, so both calls (and everything in
   // between) must run on this same reserved connection rather than the pool.
-  const reserved = await sql.reserve()
+  const reserved = await db.reserve()
 
   try {
     const [{ acquired }] = await reserved`

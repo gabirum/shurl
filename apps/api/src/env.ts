@@ -7,7 +7,9 @@ const envSchema = z.object({
   AUDIENCE: z.string(),
   JWT_ROLE_CLAIM: z.string(),
   JWT_USERNAME_CLAIM: z.string().default('preferred_username'),
-  DATABASE_URL: z.url({ protocol: /^mysql$/ }),
+  DATABASE_URL: z.url({ protocol: /^mysql2?$/ }),
+  MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL: z.boolean().default(false),
+  MAX_POOL_SIZE: z.int().positive().default(10),
   REDIS_URL: z.url({ protocol: /^(redis|rediss|valkey)$/ }),
   CORS_ORIGIN: z
     .string()

@@ -39,7 +39,7 @@
     "@rolldown/plugin-babel": "^0.2.3",
     "@shurl/api": "workspace:*",
     "@tanstack/eslint-plugin-query": "^5.102.3",
-    "@tanstack/router-cli": "^1.167.33",
+    "@tanstack/router-cli": "^1.167.36",
     "@tanstack/router-plugin": "^1.168.35",
     "@types/babel__core": "^7.20.5",
     "@types/bun": "^1.4.0",

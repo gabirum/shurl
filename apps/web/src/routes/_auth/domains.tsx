@@ -1,9 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { GlobeIcon, PlusIcon, TrashIcon } from 'lucide-react'
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +25,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { domainsApi, type Domain } from '@/lib/domains'
-import { useApiErrorMessage } from '@/lib/links'
+import { useApiErrorMessage } from '@/lib/api-utils'
 import { useIsAdmin } from '@/lib/auth'
+import { domainsApi, type Domain } from '@/lib/domains'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { GlobeIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 export const Route = createFileRoute('/_auth/domains')({ component: RouteComponent })
 

@@ -3,5 +3,6 @@ import env from './env'
 
 export const logger = pino({
   level: env.LOG_LEVEL,
-  transport: Bun.env.NODE_ENV === 'production' ? undefined : { target: 'pino-pretty' },
+  // pino transports run in a worker thread, which is torn down with each `--isolate` test file and surfaces as an unhandled error
+  transport: ['production', 'test'].includes(Bun.env.NODE_ENV ?? '') ? undefined : { target: 'pino-pretty' },
 })

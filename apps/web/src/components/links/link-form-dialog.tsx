@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { domainsApi } from '@/lib/domains'
 import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
 import { REDIRECT_STATUSES, type RedirectStatus } from '@/lib/links-schema'
 
@@ -30,21 +31,27 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
 
   const [url, setUrl] = useState(props.link?.url ?? '')
   const [code, setCode] = useState('')
+  const [domainId, setDomainId] = useState<number | null>(null)
   const [redirectStatus, setRedirectStatus] = useState<RedirectStatus>(props.link?.redirectStatus ?? 302)
   const [error, setError] = useState<string | null>(null)
 
   function reset() {
     setUrl(props.link?.url ?? '')
     setCode('')
+    setDomainId(null)
     setRedirectStatus(props.link?.redirectStatus ?? 302)
     setError(null)
   }
 
+  const domains = useQuery({ queryKey: ['domains'], queryFn: domainsApi.list, enabled: mode === 'create' && open })
+  // Defaults to the first domain until the user picks one.
+  const selectedDomainId = domainId ?? domains.data?.[0]?.id ?? null
+
   const mutation = useMutation({
     mutationFn: () =>
       mode === 'create'
-        ? linksApi.create({ url, redirectStatus, code: code || undefined })
-        : linksApi.update(props.link.code, { url, redirectStatus }),
+        ? linksApi.create({ domainId: selectedDomainId!, url, redirectStatus, code: code || undefined })
+        : linksApi.update(props.link.id, { url, redirectStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
       toast.success(mode === 'create' ? t('linkForm.createdToast') : t('linkForm.updatedToast'))
@@ -96,6 +103,28 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
             </Field>
             {mode === 'create' && (
               <Field>
+                <FieldLabel htmlFor="link-domain">{t('linkForm.domainLabel')}</FieldLabel>
+                <Select
+                  value={selectedDomainId === null ? '' : String(selectedDomainId)}
+                  onValueChange={value => setDomainId(Number(value))}
+                  disabled={!domains.data?.length}
+                >
+                  <SelectTrigger id="link-domain" className="w-full">
+                    <SelectValue placeholder={t('linkForm.domainPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {domains.data?.map(domain => (
+                      <SelectItem key={domain.id} value={String(domain.id)}>
+                        {domain.host}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {domains.data?.length === 0 && <FieldDescription>{t('linkForm.noDomains')}</FieldDescription>}
+              </Field>
+            )}
+            {mode === 'create' && (
+              <Field>
                 <FieldLabel htmlFor="link-code">{t('linkForm.aliasLabel')}</FieldLabel>
                 <Input
                   id="link-code"
@@ -133,7 +162,11 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit" form="link-form" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            form="link-form"
+            disabled={mutation.isPending || (mode === 'create' && selectedDomainId === null)}
+          >
             {mutation.isPending && <Spinner data-icon="inline-start" />}
             {mode === 'create' ? t('linkForm.submitCreate') : t('linkForm.submitEdit')}
           </Button>

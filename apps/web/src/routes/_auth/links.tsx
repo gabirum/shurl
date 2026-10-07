@@ -130,7 +130,7 @@ function RouteComponent() {
         <LinkFormDialog mode="edit" link={editing} open={!!editing} onOpenChange={open => !open && setEditing(null)} />
       )}
       {deleting && (
-        <DeleteLinkDialog code={deleting.code} open={!!deleting} onOpenChange={open => !open && setDeleting(null)} />
+        <DeleteLinkDialog link={deleting} open={!!deleting} onOpenChange={open => !open && setDeleting(null)} />
       )}
     </div>
   )

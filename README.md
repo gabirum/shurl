@@ -13,18 +13,15 @@ This application has dependencies on other services:
 
 Bun workspaces monorepo with two apps: `apps/api` (`@shurl/api`, Hono backend) and `apps/web` (`@shurl/web`, React frontend). See [CLAUDE.md](CLAUDE.md) for the full internals (package-by-feature layout, caching, error handling, etc). The part that matters for deploying it is the route surface, since it drives ingress/proxy config:
 
-| Path                      | Owner   | Notes                                                                                                                        |
-| ------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `/:code`                  | api     | Public redirect, at the root so short links stay short. It's the api's catch-all — any one-segment path not listed below.    |
-| `/shurl/api/auth/links*`  | api     | Link CRUD, requires a JWT (`Authorization: Bearer`).                                                                          |
-| `/shurl/api/docs`         | api     | Swagger UI.                                                                                                                   |
-| `/shurl/api/openapi.json` | api     | OpenAPI document.                                                                                                             |
-| `/health`                 | api/web | Liveness only — doesn't check MySQL/Redis. In-cluster probes hit the api pod directly; publicly it must be routed to the web app instead, or it'd be swallowed by the api's `/:code` catch-all. |
-| `/metrics`                | api/web | Prometheus metrics, **IP-restricted** (loopback/private ranges) at the app layer — that alone doesn't stop a request arriving through a proxy, so it must also be routed to the web app publicly (same reasoning as `/health`) and scraped only in-cluster. |
-| `/shurl`                  | web     | The SPA itself (Vite `base: /shurl/` in production builds).                                                                   |
-| `/` (exact)               | web     | Redirects to `/shurl`.                                                                                                        |
+The api dispatches by the request's **Host** header (`apps/api/src/index.ts`), so the proxy in front must preserve it:
 
-Because `/shurl/api` (api) and `/shurl` (web) share a prefix, and the api's redirect route now claims the bare root, the reverse proxy in front must route the longer, more specific paths first (`/shurl/api`, `/shurl`), then the exact-match root paths (`/`, `/health`, `/metrics`) to the web app, and only then fall through everything else at `/` to the api — both the sample Ingress and HTTPRoute in [k8s](k8s) do this.
+| Host                        | Serves                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADMIN_HOST` (env)          | `/shurl/api/auth/links*` and `/shurl/api/auth/domains*` (JWT), `/shurl/api/docs`, `/shurl/api/openapi.json`, `/health`, `/metrics`. The SPA (`/shurl`, web) shares this host via the proxy. |
+| A registered domain (DB)    | `GET /:code` only — the public redirect. Codes are unique **per domain**; there are no reserved codes.                                                                                      |
+| Anything else (e.g. pod IP) | `/health` and `/metrics` only, so in-cluster probes work without a registered Host.                                                                                                         |
+
+Domains are managed by admins in the UI (`/shurl/domains`) or via `/shurl/api/auth/domains`; a link belongs to exactly one domain and a domain with links can't be deleted. The api refreshes its domain list every 30s, so a domain created on another instance may take up to that long to start resolving. DNS and TLS for new domains are not automated. `/metrics` is IP-restricted (loopback/private ranges) at the app layer, which doesn't stop requests arriving through a proxy — scrape it in-cluster only. The sample Ingress and HTTPRoute in [k8s](k8s) route the admin host to api/web and everything else to the api.
 
 ## Development
 
@@ -72,28 +69,29 @@ bun run --filter @shurl/web dev
 
 ### `apps/api` (validated in `apps/api/src/env.ts`; boots fail-fast if anything is missing/invalid)
 
-| Variable          | Notes                                                                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LOG_LEVEL`       | `silent`\|`fatal`\|`error`\|`warn`\|`info`\|`debug`\|`trace`.                                                                                             |
-| `JWKS_URI`        | Must point at the **JWKS document**, e.g. `.../realms/shurl/protocol/openid-connect/certs` — not the realm URL itself.                                    |
-| `JWK_ISSUER`      | Expected `iss` claim, e.g. `.../realms/shurl`.                                                                                                            |
-| `AUDIENCE`        | Expected `aud` claim.                                                                                                                                     |
-| `JWT_ROLE_CLAIM`  | Dot-delimited path to the roles claim, e.g. `resource_access.shurl.roles` for a Keycloak client-scoped role mapper (`resource_access.<client_id>.roles`). |
-| `DATABASE_URL`    | Must be a `mysql://` URL.                                                                                                                                 |
-| `REDIS_URL`       | `redis://`, `rediss://`, or `valkey://`.                                                                                                                  |
-| `CORS_ORIGIN`     | Comma-separated list of allowed origins.                                                                                                                  |
-| `PUBLIC_BASE_URL` | Public origin serving the redirect route at the root — used to build each link's full `shortUrl`.                                                        |
+| Variable          | Notes                                                                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`       | `silent`\|`fatal`\|`error`\|`warn`\|`info`\|`debug`\|`trace`.                                                                                                                             |
+| `JWKS_URI`        | Must point at the **JWKS document**, e.g. `.../realms/shurl/protocol/openid-connect/certs` — not the realm URL itself.                                                                    |
+| `JWK_ISSUER`      | Expected `iss` claim, e.g. `.../realms/shurl`.                                                                                                                                            |
+| `AUDIENCE`        | Expected `aud` claim.                                                                                                                                                                     |
+| `JWT_ROLE_CLAIM`  | Dot-delimited path to the roles claim, e.g. `resource_access.shurl.roles` for a Keycloak client-scoped role mapper (`resource_access.<client_id>.roles`).                                 |
+| `DATABASE_URL`    | Must be a `mysql://` URL.                                                                                                                                                                 |
+| `REDIS_URL`       | `redis://`, `rediss://`, or `valkey://`.                                                                                                                                                  |
+| `CORS_ORIGIN`     | Comma-separated list of allowed origins.                                                                                                                                                  |
+| `ADMIN_HOST`      | Host (`host[:port]`) serving the administrative app: `/shurl/api/*` (management API + docs), `/health`, `/metrics`. Every other host is either a registered short-link domain or ignored. |
+| `PUBLIC_BASE_URL` | _Optional, legacy._ Only used on the first boot after upgrading to domains: its host is registered and pre-existing links are moved onto it. Boot fails if links exist and it's unset.    |
 
 ### `apps/web` (`apps/web/.env.local` for local dev; see `apps/web/src/env.ts`)
 
 Read from `window.RUNTIME_ENV` first (container runtime injection — see Deployment below), falling back to Vite's build-time `VITE_*` vars.
 
-| Runtime key      | Build-time (`.env.local`) key | Notes                                                                              |
-| ---------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
-| `API_URL`        | `VITE_API_URL`                | **Must include the `/shurl/api` prefix**, e.g. `https://sh.example.com/shurl/api`. |
-| `OIDC_ISSUER`    | `VITE_OIDC_ISSUER`            | The OIDC issuer URL.                                                               |
-| `OIDC_CLIENT_ID` | `VITE_OIDC_CLIENT_ID`         | The public SPA client id (`shurl` in the sample realm).                            |
-| —                | `VITE_OIDC_USE_MOCK`          | `true` swaps in a mock login for local dev without a real IdP.                     |
+| Runtime key      | Build-time (`.env.local`) key | Notes                                                                                    |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `API_URL`        | `VITE_API_URL`                | **Must include the `/shurl/api` prefix**, e.g. `https://admin.sh.example.com/shurl/api`. |
+| `OIDC_ISSUER`    | `VITE_OIDC_ISSUER`            | The OIDC issuer URL.                                                                     |
+| `OIDC_CLIENT_ID` | `VITE_OIDC_CLIENT_ID`         | The public SPA client id (`shurl` in the sample realm).                                  |
+| —                | `VITE_OIDC_USE_MOCK`          | `true` swaps in a mock login for local dev without a real IdP.                           |
 
 ## Authentication
 

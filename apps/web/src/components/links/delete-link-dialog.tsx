@@ -12,23 +12,24 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
-import { useApiErrorMessage, linksApi } from '@/lib/links'
+import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
 
 export function DeleteLinkDialog({
-  code,
+  link,
   open,
   onOpenChange,
 }: {
-  code: string
+  link: Link
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation()
+  const code = `${link.domain}/${link.code}`
   const queryClient = useQueryClient()
   const apiErrorMessage = useApiErrorMessage()
 
   const mutation = useMutation({
-    mutationFn: () => linksApi.remove(code),
+    mutationFn: () => linksApi.remove(link.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
       toast.success(t('deleteLink.deletedToast', { code }))

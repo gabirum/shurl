@@ -43,7 +43,10 @@
       "302": "302 · Temporary (Found)",
       "307": "307 · Temporary (method preserved)",
       "308": "308 · Permanent (immutable)"
-    }
+    },
+    "domainLabel": "Domain",
+    "domainPlaceholder": "Select a domain",
+    "noDomains": "No domains registered yet — ask an administrator to add one."
   },
   "deleteLink": {
     "title": "Delete {{code}}?",
@@ -58,6 +61,28 @@
     "E_LINK_IMMUTABLE": "Permanent links cannot be modified",
     "E_CODE_GENERATION": "Failed to generate a unique code — please try again",
     "E_INTERNAL": "Internal server error",
-    "unknown": "Something went wrong"
+    "unknown": "Something went wrong",
+    "E_DOMAIN_NOT_FOUND": "Domain not found",
+    "E_DOMAIN_CONFLICT": "That domain is already registered",
+    "E_DOMAIN_IN_USE": "This domain still has links and cannot be deleted"
+  },
+  "nav": { "links": "Links", "domains": "Domains" },
+  "domains": {
+    "title": "Domains",
+    "new": "New domain",
+    "loadError": "Couldn't load domains",
+    "forbidden": "Only administrators can manage domains",
+    "empty": { "title": "No domains yet", "description": "Register a domain before creating links." },
+    "table": { "host": "Host", "scheme": "Scheme" },
+    "createTitle": "New domain",
+    "createDescription": "Short links are served from the domains registered here.",
+    "hostLabel": "Host",
+    "hostHelp": "Hostname with optional port, e.g. sh.example.com. DNS and TLS must be set up separately.",
+    "schemeLabel": "Scheme",
+    "submitCreate": "Add domain",
+    "createdToast": "Domain added",
+    "deleteTitle": "Delete {{host}}?",
+    "deleteDescription": "Only domains without links can be deleted. Short links on this domain will stop resolving.",
+    "deletedToast": "Deleted {{host}}"
   }
 }

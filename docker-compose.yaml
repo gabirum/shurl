@@ -29,6 +29,7 @@ services:
       - AUDIENCE=shurl
       - JWT_ROLE_CLAIM=resource_access.shurl.roles
       - JWT_USERNAME_CLAIM=preferred_username
+      - ADMIN_HOST=localhost:3000
     env_file:
       - apps/api/.env
     ports:

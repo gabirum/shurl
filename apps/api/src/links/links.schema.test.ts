@@ -3,12 +3,12 @@ import { createLinkSchema, updateLinkSchema } from './links.schema'
 
 describe('createLinkSchema', () => {
   test('accepts a valid https URL', () => {
-    const result = createLinkSchema.safeParse({ url: 'https://example.com/path', redirectStatus: 302 })
+    const result = createLinkSchema.safeParse({ domainId: 1, url: 'https://example.com/path', redirectStatus: 302 })
     expect(result.success).toBe(true)
   })
 
   test('rejects a javascript: URL', () => {
-    const result = createLinkSchema.safeParse({ url: 'javascript:alert(1)', redirectStatus: 302 })
+    const result = createLinkSchema.safeParse({ domainId: 1, url: 'javascript:alert(1)', redirectStatus: 302 })
     expect(result.success).toBe(false)
   })
 
@@ -18,18 +18,18 @@ describe('createLinkSchema', () => {
   })
 
   test('rejects a file: URL', () => {
-    const result = createLinkSchema.safeParse({ url: 'file:///etc/passwd', redirectStatus: 302 })
+    const result = createLinkSchema.safeParse({ domainId: 1, url: 'file:///etc/passwd', redirectStatus: 302 })
     expect(result.success).toBe(false)
   })
 
   test('rejects a URL longer than 2048 characters', () => {
     const url = `https://example.com/${'a'.repeat(2048)}`
-    const result = createLinkSchema.safeParse({ url, redirectStatus: 302 })
+    const result = createLinkSchema.safeParse({ domainId: 1, url, redirectStatus: 302 })
     expect(result.success).toBe(false)
   })
 
   test('rejects a redirect status outside 302/307/308', () => {
-    const result = createLinkSchema.safeParse({ url: 'https://example.com', redirectStatus: 301 })
+    const result = createLinkSchema.safeParse({ domainId: 1, url: 'https://example.com', redirectStatus: 301 })
     expect(result.success).toBe(false)
   })
 })
@@ -49,5 +49,21 @@ describe('updateLinkSchema', () => {
 
   test('rejects a javascript: URL in a patch', () => {
     expect(updateLinkSchema.safeParse({ url: 'javascript:alert(1)' }).success).toBe(false)
+  })
+})
+
+describe('createLinkSchema domainId', () => {
+  test('requires a domainId', () => {
+    expect(createLinkSchema.safeParse({ url: 'https://example.com', redirectStatus: 302 }).success).toBe(false)
+  })
+
+  test('accepts previously reserved aliases, since domains no longer share routes', () => {
+    const result = createLinkSchema.safeParse({
+      domainId: 1,
+      url: 'https://example.com',
+      redirectStatus: 302,
+      code: 'health',
+    })
+    expect(result.success).toBe(true)
   })
 })

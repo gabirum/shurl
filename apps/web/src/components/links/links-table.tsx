@@ -65,7 +65,7 @@ export function LinksTable({
   onDelete: (link: Link) => void
 }) {
   const { t, i18n } = useTranslation()
-  const [openMenuCode, setOpenMenuCode] = useState<string | null>(null)
+  const [openMenuCode, setOpenMenuCode] = useState<number | null>(null)
 
   return (
     <Table>
@@ -84,10 +84,13 @@ export function LinksTable({
         {links.map(link => {
           const immutable = link.redirectStatus === PERMANENT_REDIRECT_STATUS
           return (
-            <TableRow key={link.code}>
+            <TableRow key={link.id}>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  <span className="font-mono text-sm">{link.code}</span>
+                  <span className="font-mono text-sm">
+                    <span className="text-muted-foreground">{link.domain}/</span>
+                    {link.code}
+                  </span>
                   <CopyCodeButton shortUrl={link.shortUrl} />
                 </div>
               </TableCell>
@@ -123,10 +126,7 @@ export function LinksTable({
                 {new Date(link.createdAt).toLocaleDateString(i18n.language)}
               </TableCell>
               <TableCell>
-                <DropdownMenu
-                  open={openMenuCode === link.code}
-                  onOpenChange={o => setOpenMenuCode(o ? link.code : null)}
-                >
+                <DropdownMenu open={openMenuCode === link.id} onOpenChange={o => setOpenMenuCode(o ? link.id : null)}>
                   <DropdownMenuTrigger
                     render={
                       <Button variant="ghost" size="icon-sm">

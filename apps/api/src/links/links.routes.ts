@@ -3,12 +3,13 @@ import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
 import { ADMIN_ROLE, getUsername, hasRole } from '../auth'
-import env from '../env'
+import { findDomainByHost } from '../domains/domains.registry'
 import type { LinkRow } from './links.repository'
 import {
   codeParamSchema,
   createLinkSchema,
   errorSchema,
+  idParamSchema,
   linkPageSchema,
   linkSchema,
   paginationSchema,
@@ -41,8 +42,11 @@ function usernameOf(c: Context<Env>): string | undefined {
 
 function toDto(link: LinkRow) {
   return {
+    id: Number(link.id),
     code: link.code,
-    shortUrl: `${env.PUBLIC_BASE_URL}/${link.code}`,
+    domainId: Number(link.domain_id),
+    domain: link.domain_host,
+    shortUrl: `${link.domain_scheme}://${link.domain_host}/${link.code}`,
     url: link.target_url,
     redirectStatus: link.redirect_status,
     owner: link.owner,
@@ -96,11 +100,11 @@ export const managedLinks = new OpenAPIHono<Env>()
   .openapi(
     createRoute({
       method: 'get',
-      path: '/{code}',
+      path: '/{id}',
       tags,
       security,
-      summary: 'Get a link by code (any owner, for admins)',
-      request: { params: codeParamSchema },
+      summary: 'Get a link by id (any owner, for admins)',
+      request: { params: idParamSchema },
       responses: {
         200: { content: { 'application/json': { schema: linkSchema } }, description: 'the link' },
         404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
@@ -108,20 +112,20 @@ export const managedLinks = new OpenAPIHono<Env>()
     }),
     async c => {
       const owner = ownerOf(c)
-      const { code } = c.req.valid('param')
-      const link = await linksService.get(owner, code, isAdmin(c))
+      const { id } = c.req.valid('param')
+      const link = await linksService.get(owner, id, isAdmin(c))
       return c.json(toDto(link), 200)
     },
   )
   .openapi(
     createRoute({
       method: 'patch',
-      path: '/{code}',
+      path: '/{id}',
       tags,
       security,
       summary: 'Update a link (any owner, for admins)',
       request: {
-        params: codeParamSchema,
+        params: idParamSchema,
         body: { required: true, content: { 'application/json': { schema: updateLinkSchema } } },
       },
       responses: {
@@ -135,20 +139,20 @@ export const managedLinks = new OpenAPIHono<Env>()
     }),
     async c => {
       const owner = ownerOf(c)
-      const { code } = c.req.valid('param')
+      const { id } = c.req.valid('param')
       const patch = c.req.valid('json')
-      const link = await linksService.update(owner, code, patch, isAdmin(c))
+      const link = await linksService.update(owner, id, patch, isAdmin(c))
       return c.json(toDto(link), 200)
     },
   )
   .openapi(
     createRoute({
       method: 'delete',
-      path: '/{code}',
+      path: '/{id}',
       tags,
       security,
       summary: 'Delete a link (any owner, for admins)',
-      request: { params: codeParamSchema },
+      request: { params: idParamSchema },
       responses: {
         204: { description: 'link removed' },
         404: { content: { 'application/json': { schema: errorSchema } }, description: 'link not found' },
@@ -160,8 +164,8 @@ export const managedLinks = new OpenAPIHono<Env>()
     }),
     async c => {
       const owner = ownerOf(c)
-      const { code } = c.req.valid('param')
-      await linksService.remove(owner, code, isAdmin(c))
+      const { id } = c.req.valid('param')
+      await linksService.remove(owner, id, isAdmin(c))
       return c.body(null, 204)
     },
   )
@@ -180,7 +184,9 @@ export const publicLinks = new OpenAPIHono().openapi(
   }),
   async c => {
     const { code } = c.req.valid('param')
-    const link = await linksService.resolve(code)
+    const domain = findDomainByHost(new URL(c.req.url).host.toLowerCase())
+    if (!domain) return c.notFound()
+    const link = await linksService.resolve(domain.id, code)
     if (!link) return c.notFound()
 
     return c.redirect(link.target_url, link.redirect_status)

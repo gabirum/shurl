@@ -10,11 +10,7 @@ export const codeSchema = z
 
 export const codeParamSchema = z.object({ code: codeSchema })
 
-// Reserved because they're real routes at the API root, where the public redirect now lives
-// (see apps/api/src/index.ts): a link with one of these codes would be shadowed by the route
-// and could never resolve. Compared case-insensitively, since link codes are looked up with
-// MySQL's default case-insensitive collation.
-export const RESERVED_CODES = new Set(['health', 'metrics', 'shurl', 'docs', 'api'])
+export const idParamSchema = z.object({ id: z.coerce.number().int().positive().openapi({ example: 1 }) })
 
 // `.openapi({ enum })` works around @asteasolutions/zod-to-openapi only emitting the first
 // value of a multi-value z.literal() (it otherwise renders `enum: [302]` instead of all three).
@@ -32,12 +28,10 @@ export const createLinkSchema = z
       example: 302,
       description: '302/307 are temporary, 308 makes the link permanently immutable',
     }),
+    domainId: z.number().int().positive().openapi({ example: 1, description: 'id of a registered domain' }),
     code: codeSchema
       .optional()
-      .refine(code => code === undefined || !RESERVED_CODES.has(code.toLowerCase()), {
-        message: `code must not be one of the reserved values: ${[...RESERVED_CODES].join(', ')}`,
-      })
-      .openapi({ description: 'custom alias; a random code is generated if omitted' }),
+      .openapi({ description: 'custom alias, unique per domain; a random code is generated if omitted' }),
   })
   .openapi('CreateLinkInput')
 
@@ -58,7 +52,10 @@ export const paginationSchema = z.object({
 
 export const linkSchema = z
   .object({
+    id: z.number().int().openapi({ example: 1 }),
     code: codeSchema,
+    domainId: z.number().int().openapi({ example: 1 }),
+    domain: z.string().openapi({ example: 'sh.example.com', description: 'host of the link’s domain' }),
     shortUrl: z.url().openapi({ example: 'https://sh.example.com/aZ3-1x9', description: 'full shortened URL' }),
     url: z.url().openapi({ example: 'https://example.com/some/very/long/path' }),
     redirectStatus: redirectStatusSchema.openapi({ example: 302 }),

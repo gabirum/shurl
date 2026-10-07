@@ -49,7 +49,10 @@
       "302": "302 · Temporário (Found)",
       "307": "307 · Temporário (preserva o método)",
       "308": "308 · Permanente (imutável)"
-    }
+    },
+    "domainLabel": "Domínio",
+    "domainPlaceholder": "Selecione um domínio",
+    "noDomains": "Nenhum domínio cadastrado — peça a um administrador para adicionar."
   },
   "deleteLink": {
     "title": "Excluir {{code}}?",
@@ -64,6 +67,28 @@
     "E_LINK_IMMUTABLE": "Links permanentes não podem ser modificados",
     "E_CODE_GENERATION": "Falha ao gerar um código único — tente novamente",
     "E_INTERNAL": "Erro interno do servidor",
-    "unknown": "Algo deu errado"
+    "unknown": "Algo deu errado",
+    "E_DOMAIN_NOT_FOUND": "Domínio não encontrado",
+    "E_DOMAIN_CONFLICT": "Este domínio já está cadastrado",
+    "E_DOMAIN_IN_USE": "Este domínio ainda possui links e não pode ser excluído"
+  },
+  "nav": { "links": "Links", "domains": "Domínios" },
+  "domains": {
+    "title": "Domínios",
+    "new": "Novo domínio",
+    "loadError": "Não foi possível carregar os domínios",
+    "forbidden": "Somente administradores podem gerenciar domínios",
+    "empty": { "title": "Nenhum domínio ainda", "description": "Cadastre um domínio antes de criar links." },
+    "table": { "host": "Host", "scheme": "Esquema" },
+    "createTitle": "Novo domínio",
+    "createDescription": "Os links curtos são servidos pelos domínios cadastrados aqui.",
+    "hostLabel": "Host",
+    "hostHelp": "Nome do host com porta opcional, ex.: sh.example.com. DNS e TLS devem ser configurados à parte.",
+    "schemeLabel": "Esquema",
+    "submitCreate": "Adicionar domínio",
+    "createdToast": "Domínio adicionado",
+    "deleteTitle": "Excluir {{host}}?",
+    "deleteDescription": "Só é possível excluir domínios sem links. Os links curtos deste domínio deixarão de funcionar.",
+    "deletedToast": "{{host}} excluído"
   }
 }

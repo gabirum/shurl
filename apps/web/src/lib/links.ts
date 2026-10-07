@@ -4,8 +4,8 @@ import { api } from '@/api'
 
 const listLinks = api.auth.links.$get
 const createLink = api.auth.links.$post
-const updateLink = api.auth.links[':code'].$patch
-const removeLink = api.auth.links[':code'].$delete
+const updateLink = api.auth.links[':id'].$patch
+const removeLink = api.auth.links[':id'].$delete
 
 export type Link = InferResponseType<typeof createLink, 201>
 export type LinkPage = InferResponseType<typeof listLinks, 200>
@@ -33,10 +33,10 @@ export const linksApi = {
   list: (page: number, size: number) =>
     listLinks({ query: { page: String(page), size: String(size) } }).then(res => unwrap<LinkPage>(res)),
   create: (input: CreateLinkInput) => createLink({ json: input }).then(res => unwrap<Link>(res)),
-  update: (code: string, patch: UpdateLinkInput) =>
-    updateLink({ param: { code }, json: patch }).then(res => unwrap<Link>(res)),
-  remove: (code: string) =>
-    removeLink({ param: { code } }).then(res => {
+  update: (id: number, patch: UpdateLinkInput) =>
+    updateLink({ param: { id: String(id) }, json: patch }).then(res => unwrap<Link>(res)),
+  remove: (id: number) =>
+    removeLink({ param: { id: String(id) } }).then(res => {
       if (!res.ok) return unwrap(res)
     }),
 }
@@ -49,6 +49,9 @@ const KNOWN_ERROR_CODES = [
   'E_CODE_CONFLICT',
   'E_LINK_IMMUTABLE',
   'E_CODE_GENERATION',
+  'E_DOMAIN_NOT_FOUND',
+  'E_DOMAIN_CONFLICT',
+  'E_DOMAIN_IN_USE',
   'E_INTERNAL',
 ] as const
 

@@ -15,10 +15,10 @@ const { recordHit, flushNow } = await import('./links.counter')
 
 describe('flushNow', () => {
   test('merges hits recorded during a failed flush instead of discarding them', async () => {
-    recordHit('abc') // this hit is captured into the batch sent to the failing flush below
+    recordHit(1) // this hit is captured into the batch sent to the failing flush below
     const flushPromise = flushNow()
 
-    recordHit('abc') // recorded while the flush above is in flight and about to fail
+    recordHit(1) // recorded while the flush above is in flight and about to fail
 
     rejectFlush(new Error('boom'))
     await flushPromise
@@ -26,6 +26,6 @@ describe('flushNow', () => {
     bumpAccessCounts.mockImplementation(async () => {})
     await flushNow()
 
-    expect(bumpAccessCounts).toHaveBeenLastCalledWith(new Map([['abc', 2]]))
+    expect(bumpAccessCounts).toHaveBeenLastCalledWith(new Map([[1, 2]]))
   })
 })

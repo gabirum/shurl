@@ -15,7 +15,16 @@ const envSchema = z.object({
     .string()
     .transform(value => value.split(',').map(origin => origin.trim()))
     .pipe(z.array(z.url({ protocol: /^https?$/ }))),
-  PUBLIC_BASE_URL: z.url({ protocol: /^https?$/ }).transform(value => value.replace(/\/+$/, '')),
+  ADMIN_HOST: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/, 'ADMIN_HOST must be host[:port]'),
+  // Legacy: only used by the 0004/0005 migrations to backfill a domain for links created before domains existed.
+  PUBLIC_BASE_URL: z
+    .url({ protocol: /^https?$/ })
+    .transform(value => value.replace(/\/+$/, ''))
+    .optional(),
 })
 
 const { data: env, error } = envSchema.safeParse(Bun.env)

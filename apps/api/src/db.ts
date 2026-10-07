@@ -1,6 +1,7 @@
 import { Glob } from 'bun'
 import { logger } from './logger'
 import { db } from './db/client'
+import env from './env'
 
 const migrationsDir = `${import.meta.dir}/db/migrations`
 
@@ -40,6 +41,12 @@ export async function migrate() {
       // but the schema change wasn't. Every migration file must therefore be either
       // idempotent (`IF NOT EXISTS` / `IF EXISTS`) or a single statement, so a failure never
       // leaves partial, unrecorded DDL applied.
+      // Session variables consumed by the legacy-domain backfill migrations (0004/0005); NULL
+      // when PUBLIC_BASE_URL is unset, in which case 0006 fails if any link is left domainless.
+      const legacy = env.PUBLIC_BASE_URL ? new URL(env.PUBLIC_BASE_URL) : null
+      await reserved`SET @shurl_legacy_host = ${legacy?.host.toLowerCase() ?? null}`
+      await reserved`SET @shurl_legacy_scheme = ${legacy ? legacy.protocol.slice(0, -1) : null}`
+
       const files = Array.from(new Glob('*.sql').scanSync({ cwd: migrationsDir })).sort()
       for (const name of files) {
         const [applied] = await reserved`SELECT 1 FROM schema_migrations WHERE name = ${name}`

@@ -1,25 +1,19 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: shurl
+  name: shurl-admin
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: 'true'
 spec:
   ingressClassName: nginx
   tls:
-    - hosts: [sh.example.com]
-      secretName: shurl-tls
+    - hosts: [admin.sh.example.com]
+      secretName: shurl-admin-tls
   rules:
-    - host: sh.example.com
+    # Administrative host (ADMIN_HOST in apps/api): the management API/docs and the SPA.
+    - host: admin.sh.example.com
       http:
         paths:
-          # The public redirect (apps/api/src/links/links.routes.ts's publicLinks, GET /{code})
-          # is mounted at the API's root, so it's the catch-all for this host: any one-segment
-          # path that isn't one of the exact routes below is a short code and goes to the api.
-          # ingress-nginx evaluates Exact before Prefix, and among Prefix matches the longest
-          # wins — so /shurl/api and /shurl are safe ahead of the root Prefix rule regardless
-          # of order, but Exact rules must exist for /, /health, and /metrics or they'd be
-          # swallowed by the api's root Prefix rule (a code param matches any of those strings).
           - path: /shurl/api
             pathType: Prefix
             backend:
@@ -34,8 +28,7 @@ spec:
                 name: shurl-web
                 port:
                   name: http
-          # / (exact) is the SPA's own root redirect (apps/web/default.conf: 302 -> /shurl/),
-          # not a short code.
+          # / (exact) is the SPA's own root redirect (apps/web/default.conf: 302 -> /shurl/).
           - path: /
             pathType: Exact
             backend:
@@ -43,24 +36,28 @@ spec:
                 name: shurl-web
                 port:
                   name: http
-          # /health and /metrics are also real short-code shapes; keep them on the web
-          # container's probe/placeholder handlers rather than letting the api's root catch-all
-          # take them. The api's own /metrics stays IP-restricted and is scraped in-cluster,
-          # never through this ingress (see k8s/base/api-service.yaml).
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: shurl-web
-                port:
-                  name: http
-          - path: /metrics
-            pathType: Exact
-            backend:
-              service:
-                name: shurl-web
-                port:
-                  name: http
+---
+# Short-link domains are registered at runtime (apps/api's `domains` table), so this ingress has
+# no host: it catches every Host not claimed by a more specific rule and forwards it to the api,
+# which dispatches by Host header (apps/api/src/index.ts) — a registered domain serves
+# GET /{code}, anything else only /health and /metrics. Each new domain still needs DNS pointing
+# at the ingress and a TLS certificate (add its host to `tls` below, or use a wildcard/ACME
+# solution); the api's own /metrics stays IP-restricted and is scraped in-cluster (see
+# k8s/base/api-service.yaml).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shurl-redirect
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [sh.example.com]
+      secretName: shurl-tls
+  rules:
+    - http:
+        paths:
           - path: /
             pathType: Prefix
             backend:

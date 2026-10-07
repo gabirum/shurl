@@ -1,21 +1,16 @@
-import { prometheus } from '@hono/prometheus'
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { getConnInfo } from 'hono/bun'
 import { cors } from 'hono/cors'
-import { HTTPException } from 'hono/http-exception'
-import { ipRestriction } from 'hono/ip-restriction'
 import { jwk } from 'hono/jwk'
-import type { JwtVariables } from 'hono/jwt'
 import { prettyJSON } from 'hono/pretty-json'
-import { requestId, RequestIdVariables } from 'hono/request-id'
-import { secureHeaders } from 'hono/secure-headers'
+import { addOpsRoutes, createBaseApp, type AppEnv } from './app'
 import { migrate } from './db'
+import { findDomainByHost, loadDomains } from './domains/domains.registry'
+import { managedDomains } from './domains/domains.routes'
 import env from './env'
 import { flushNow } from './links/links.counter'
 import { managedLinks, publicLinks } from './links/links.routes'
 import { logger } from './logger'
-import { Exception } from './util'
 
 process.on('uncaughtException', error => {
   logger.fatal({ err: error }, 'uncaught exception, terminating')
@@ -41,77 +36,38 @@ async function shutdown(signal: string) {
 process.on('SIGTERM', () => void shutdown('SIGTERM'))
 process.on('SIGINT', () => void shutdown('SIGINT'))
 
-const app = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
-const { printMetrics, registerMetrics } = prometheus({ collectDefaultMetrics: true })
-
-app.use(requestId())
-app.use(async (c, next) => {
-  const start = performance.now()
-  await next()
-  const end = performance.now()
-
-  const fields = {
-    requestId: c.get('requestId'),
-    method: c.req.method,
-    path: c.req.path,
-    status: c.res.status,
-    durationMs: Math.round(end - start),
-  }
-  if (c.res.status >= 500) logger.error(fields, 'request completed')
-  else if (c.res.status >= 400) logger.warn(fields, 'request completed')
-  else logger.info(fields, 'request completed')
-})
-app.use(cors({ origin: env.CORS_ORIGIN }))
-app.use(secureHeaders())
-app.use(prettyJSON())
-app.use(registerMetrics)
-
-app.get('/health', c => c.text('ok'))
-
-app.get(
-  '/metrics',
-  ipRestriction(getConnInfo, {
-    allowList: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'],
-  }),
-  printMetrics,
-)
-
-// Administrative + docs routes are namespaced under /shurl/api so they can share an ingress
-// path with the frontend (served under /shurl) while the public redirect stays at the
-// root so short links resolve as `${PUBLIC_BASE_URL}/{code}`.
-const adminApp = new OpenAPIHono<{ Variables: RequestIdVariables & JwtVariables }>()
-adminApp.use(
+// Requests are dispatched by Host (see `fetch` below) to one of three apps, so no route can
+// shadow another and no short-code slugs need to be reserved:
+//   ADMIN_HOST        -> adminApp: /shurl/api/* (management API + docs), /health, /metrics
+//   registered domain -> redirectApp: GET /{code} only
+//   any other host    -> opsApp: /health, /metrics only (e.g. probes hitting the pod IP)
+const adminApi = new OpenAPIHono<AppEnv>()
+adminApi.use(
   '/auth/*',
   jwk({ alg: ['RS256'], jwks_uri: env.JWKS_URI, verification: { aud: env.AUDIENCE, iss: env.JWK_ISSUER } }),
 )
-const adminRoutes = adminApp.route('/auth/links', managedLinks)
-app.route('/shurl/api', adminRoutes)
+const adminRoutes = adminApi.route('/auth/links', managedLinks).route('/auth/domains', managedDomains)
 
-app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
+const adminApp = addOpsRoutes(createBaseApp())
+adminApp.use(cors({ origin: env.CORS_ORIGIN }))
+adminApp.use(prettyJSON())
+adminApp.route('/shurl/api', adminRoutes)
+
+adminApp.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',
   scheme: 'bearer',
   bearerFormat: 'JWT',
 })
-
-app.doc('/shurl/api/openapi.json', {
+adminApp.doc('/shurl/api/openapi.json', {
   openapi: '3.1.0',
   info: { title: 'shurl', version: '1.0.0', description: 'URL shortener API' },
 })
-app.get('/shurl/api/docs', swaggerUI({ url: '/shurl/api/openapi.json' }))
+adminApp.get('/shurl/api/docs', swaggerUI({ url: '/shurl/api/openapi.json' }))
 
-// publicLinks (GET /{code}) is registered last and mounted at the root: it's a one-segment
-// wildcard, so it must come after every other route or it would shadow /health, /metrics, and
-// /shurl/api/* instead of falling through to them. RESERVED_CODES (links.schema.ts) keeps
-// those exact segments from ever being issued as short codes in the first place.
-app.route('/', publicLinks)
+const redirectApp = createBaseApp()
+redirectApp.route('/', publicLinks)
 
-app.onError((err, c) => {
-  if (err instanceof HTTPException) return err.getResponse()
-  if (err instanceof Exception) return c.json({ code: err.code, message: err.message }, err.suggestedStatus)
-
-  logger.error({ err, requestId: c.get('requestId') }, 'unhandled error')
-  return c.json({ code: 'E_INTERNAL', message: 'internal server error' }, 500)
-})
+const opsApp = addOpsRoutes(createBaseApp())
 
 try {
   await migrate()
@@ -120,6 +76,8 @@ try {
   process.exit(1)
 }
 
+await loadDomains()
+
 logger.info('shurl ready')
 
 // The RPC client type intentionally reflects the unprefixed adminRoutes shape (e.g.
@@ -127,4 +85,11 @@ logger.info('shurl ready')
 // server owns the prefix without leaking it into every call site.
 export type AppType = typeof adminRoutes
 
-export default app
+export default {
+  fetch(req: Request, server: unknown) {
+    const host = new URL(req.url).host.toLowerCase()
+    if (host === env.ADMIN_HOST) return adminApp.fetch(req, server)
+    if (findDomainByHost(host)) return redirectApp.fetch(req, server)
+    return opsApp.fetch(req, server)
+  },
+}

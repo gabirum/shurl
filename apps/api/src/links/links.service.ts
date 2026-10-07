@@ -3,7 +3,6 @@ import { recordHit } from './links.counter'
 import type { LinkRow } from './links.repository'
 import * as repo from './links.repository'
 import type { CreateLinkInput, PaginationInput, UpdateLinkInput } from './links.schema'
-import { RESERVED_CODES } from './links.schema'
 import type { Page } from '../util'
 import { createPage, Exception } from '../util'
 import { logger } from '../logger'
@@ -29,40 +28,31 @@ export const CODE_LENGTH = 7
 const MAX_GENERATION_ATTEMPTS = 5
 
 export function generateCode(): string {
-  let code: string
-  do {
-    const bytes = new Uint8Array(CODE_LENGTH)
-    crypto.getRandomValues(bytes)
-    code = ''
-    for (const byte of bytes) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
-    // Reserved codes (links.schema.ts) are real routes at the API root now that the redirect
-    // lives there — vanishingly unlikely to roll one at random, but re-roll rather than issue
-    // an unreachable link.
-  } while (RESERVED_CODES.has(code.toLowerCase()))
+  const bytes = new Uint8Array(CODE_LENGTH)
+  crypto.getRandomValues(bytes)
+  let code = ''
+  for (const byte of bytes) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
   return code
 }
 
 export async function create(owner: string, input: CreateLinkInput, ownerUsername?: string): Promise<LinkRow> {
-  const newLink = { owner, ownerUsername, url: input.url, redirectStatus: input.redirectStatus }
+  const { domainId } = input
+  const newLink = { owner, ownerUsername, domainId, url: input.url, redirectStatus: input.redirectStatus }
 
-  if (input.code) {
-    await repo.insertLink({ ...newLink, code: input.code })
-    logger.info({ owner, code: input.code, redirectStatus: input.redirectStatus }, 'link created')
-    const row = await repo.findByCode(input.code)
+  const insert = async (code: string): Promise<LinkRow> => {
+    const id = await repo.insertLink({ ...newLink, code })
+    logger.info({ owner, id, domainId, code, redirectStatus: input.redirectStatus }, 'link created')
+    const row = await repo.findById(id)
     if (!row) throw new LinkNotFoundException()
-    await setCachedLink(input.code, row)
+    await setCachedLink(domainId, code, row)
     return row
   }
 
+  if (input.code) return insert(input.code)
+
   for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
-    const code = generateCode()
     try {
-      await repo.insertLink({ ...newLink, code })
-      logger.info({ owner, code, redirectStatus: input.redirectStatus }, 'link created')
-      const row = await repo.findByCode(code)
-      if (!row) throw new LinkNotFoundException()
-      await setCachedLink(code, row)
-      return row
+      return await insert(generateCode())
     } catch (error) {
       if (error instanceof repo.CodeConflictException) continue
       throw error
@@ -71,15 +61,15 @@ export async function create(owner: string, input: CreateLinkInput, ownerUsernam
   throw new CodeGenerationExhaustedException()
 }
 
-async function getOwned(owner: string, code: string): Promise<LinkRow> {
-  const row = await repo.findByCode(code)
+async function getOwned(owner: string, id: number): Promise<LinkRow> {
+  const row = await repo.findById(id)
   if (!row || row.owner !== owner) throw new LinkNotFoundException()
   return row
 }
 
-export async function get(owner: string, code: string, isAdmin = false): Promise<LinkRow> {
-  if (!isAdmin) return getOwned(owner, code)
-  const row = await repo.findByCode(code)
+export async function get(owner: string, id: number, isAdmin = false): Promise<LinkRow> {
+  if (!isAdmin) return getOwned(owner, id)
+  const row = await repo.findById(id)
   if (!row) throw new LinkNotFoundException()
   return row
 }
@@ -96,47 +86,44 @@ export async function list(owner: string, pagination: PaginationInput, isAdmin =
 // ambiguous: the row may be gone, owned by someone else, or immutable. Re-read to map it to the
 // right status — 404 for missing/not-owned (never leak existence to a non-owner), 409 for 308.
 // `ownerScope: null` (admin) means only "gone" vs "immutable" remain possible.
-async function explainNoop(code: string, ownerScope: string | null): Promise<never> {
-  const row = await repo.findByCode(code)
+async function explainNoop(id: number, ownerScope: string | null): Promise<never> {
+  const row = await repo.findById(id)
   if (!row || (ownerScope !== null && row.owner !== ownerScope)) throw new LinkNotFoundException()
   throw new LinkImmutableException()
 }
 
-export async function update(
-  owner: string,
-  code: string,
-  patch: UpdateLinkInput,
-  isAdmin = false,
-): Promise<LinkRow> {
+export async function update(owner: string, id: number, patch: UpdateLinkInput, isAdmin = false): Promise<LinkRow> {
   const ownerScope = isAdmin ? null : owner
-  const updated = await repo.updateLink(code, ownerScope, { url: patch.url, redirectStatus: patch.redirectStatus })
-  if (!updated) await explainNoop(code, ownerScope)
-  const row = await get(owner, code, isAdmin)
-  logger.info({ actor: owner, owner: row.owner, code, patch }, 'link updated')
-  await setCachedLink(code, row)
+  const updated = await repo.updateLink(id, ownerScope, { url: patch.url, redirectStatus: patch.redirectStatus })
+  if (!updated) await explainNoop(id, ownerScope)
+  const row = await get(owner, id, isAdmin)
+  logger.info({ actor: owner, owner: row.owner, id, patch }, 'link updated')
+  await setCachedLink(row.domain_id, row.code, row)
   return row
 }
 
-export async function remove(owner: string, code: string, isAdmin = false): Promise<void> {
+export async function remove(owner: string, id: number, isAdmin = false): Promise<void> {
   const ownerScope = isAdmin ? null : owner
-  const removed = await repo.removeLink(code, ownerScope)
-  if (!removed) await explainNoop(code, ownerScope)
-  await invalidateLink(code)
-  logger.info({ actor: owner, code }, 'link removed')
+  // Read first: the cache key (domain + code) is only known from the row, and it's gone after the delete.
+  const existing = await repo.findById(id)
+  const removed = await repo.removeLink(id, ownerScope)
+  if (!removed) await explainNoop(id, ownerScope)
+  if (existing) await invalidateLink(existing.domain_id, existing.code)
+  logger.info({ actor: owner, id }, 'link removed')
 }
 
-export async function resolve(code: string): Promise<LinkRow | undefined> {
-  const cached = await getCachedLink(code)
+export async function resolve(domainId: number, code: string): Promise<LinkRow | undefined> {
+  const cached = await getCachedLink(domainId, code)
   if (cached !== undefined) {
-    if (cached) recordHit(code)
-    logger.debug({ code, cacheHit: true }, 'link resolved')
+    if (cached) recordHit(cached.id)
+    logger.debug({ domainId, code, cacheHit: true }, 'link resolved')
     return cached ?? undefined
   }
 
-  const row = await repo.findByCode(code)
-  await setCachedLink(code, row ?? null)
+  const row = await repo.findByDomainAndCode(domainId, code)
+  await setCachedLink(domainId, code, row ?? null)
   if (!row) return undefined
-  recordHit(code)
-  logger.debug({ code }, 'link resolved')
+  recordHit(row.id)
+  logger.debug({ domainId, code }, 'link resolved')
   return row
 }

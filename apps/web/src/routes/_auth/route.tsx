@@ -1,15 +1,17 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { createFileRoute, Link as RouterLink, Outlet } from '@tanstack/react-router'
 import { LinkIcon, LogOutIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { useIsAdmin } from '@/lib/auth'
 import { enforceLogin, useOidc } from '@/oidc'
 
 export const Route = createFileRoute('/_auth')({ beforeLoad: enforceLogin, component: RouteComponent })
 
 function RouteComponent() {
   const { t } = useTranslation()
+  const isAdmin = useIsAdmin()
   const { decodedIdToken, logout } = useOidc({ assert: 'user logged in' })
 
   return (
@@ -19,6 +21,16 @@ function RouteComponent() {
           <LinkIcon className="size-4 text-primary" />
           shurl
         </div>
+        <nav className="flex items-center gap-4 text-sm">
+          <RouterLink to="/links" className="text-muted-foreground [&.active]:text-foreground">
+            {t('nav.links')}
+          </RouterLink>
+          {isAdmin && (
+            <RouterLink to="/domains" className="text-muted-foreground [&.active]:text-foreground">
+              {t('nav.domains')}
+            </RouterLink>
+          )}
+        </nav>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{decodedIdToken.preferred_username}</span>
           <Separator orientation="vertical" className="h-5" />

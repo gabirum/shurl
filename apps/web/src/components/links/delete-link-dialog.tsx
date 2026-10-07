@@ -12,7 +12,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
-import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
+import { useApiErrorMessage } from '@/lib/api-utils'
+import { linksApi, type Link } from '@/lib/links'
 
 export function DeleteLinkDialog({
   link,

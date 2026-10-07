@@ -34,15 +34,15 @@
     "aliasPlaceholder": "my-link",
     "aliasHelp": "Letters, numbers, - and _. A random code is generated if left blank.",
     "statusLabel": "Redirect type",
-    "statusHelp": "Permanent (308) links can never be edited or deleted afterward — choose it deliberately.",
+    "statusHelp": "Permanent links can never be edited or deleted afterward. Also, browsers remember permanent redirects and stop asking the server, so the access count may be lower than the real one — if that metric matters, choose temporary.",
+    "advancedMode": "Advanced mode",
     "submitCreate": "Create link",
     "submitEdit": "Save changes",
     "createdToast": "Link created",
     "updatedToast": "Link updated",
     "redirectStatus": {
-      "302": "302 · Temporary (Found)",
-      "307": "307 · Temporary (method preserved)",
-      "308": "308 · Permanent (immutable)"
+      "simple": { "307": "Temporary", "308": "Permanent" },
+      "advanced": { "302": "302 Found", "307": "307 Temporary Redirect", "308": "308 Permanent Redirect" }
     },
     "domainLabel": "Domain",
     "domainPlaceholder": "Select a domain",

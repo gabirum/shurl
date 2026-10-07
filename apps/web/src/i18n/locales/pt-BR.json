@@ -40,15 +40,15 @@
     "aliasPlaceholder": "meu-link",
     "aliasHelp": "Letras, números, - e _. Um código aleatório é gerado se deixado em branco.",
     "statusLabel": "Tipo de redirecionamento",
-    "statusHelp": "Links permanentes (308) nunca podem ser editados ou excluídos depois — escolha com cuidado.",
+    "statusHelp": "Links permanentes nunca podem ser editados ou excluídos depois. Além disso, navegadores memorizam redirecionamentos permanentes e deixam de consultar o servidor, então a contagem de acessos pode ficar abaixo do real — se essa métrica for importante, use temporário.",
+    "advancedMode": "Modo avançado",
     "submitCreate": "Criar link",
     "submitEdit": "Salvar alterações",
     "createdToast": "Link criado",
     "updatedToast": "Link atualizado",
     "redirectStatus": {
-      "302": "302 · Temporário (Found)",
-      "307": "307 · Temporário (preserva o método)",
-      "308": "308 · Permanente (imutável)"
+      "simple": { "307": "Temporário", "308": "Permanente" },
+      "advanced": { "302": "302 Found", "307": "307 Temporary Redirect", "308": "308 Permanent Redirect" }
     },
     "domainLabel": "Domínio",
     "domainPlaceholder": "Selecione um domínio",

@@ -15,9 +15,16 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { domainsApi } from '@/lib/domains'
-import { useApiErrorMessage, linksApi, type Link } from '@/lib/links'
-import { REDIRECT_STATUSES, type RedirectStatus } from '@/lib/links-schema'
+import { useApiErrorMessage } from '@/lib/api-utils'
+import { linksApi, type Link } from '@/lib/links'
+import {
+  DEFAULT_REDIRECT_STATUS,
+  REDIRECT_STATUSES,
+  SIMPLE_REDIRECT_STATUSES,
+  type RedirectStatus,
+} from '@/lib/links-schema'
 
 type LinkFormDialogProps =
   | { mode: 'create'; open: boolean; onOpenChange: (open: boolean) => void; link?: undefined }
@@ -32,14 +39,19 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
   const [url, setUrl] = useState(props.link?.url ?? '')
   const [code, setCode] = useState('')
   const [domainId, setDomainId] = useState<number | null>(null)
-  const [redirectStatus, setRedirectStatus] = useState<RedirectStatus>(props.link?.redirectStatus ?? 302)
+  const [redirectStatus, setRedirectStatus] = useState<RedirectStatus>(
+    props.link?.redirectStatus ?? DEFAULT_REDIRECT_STATUS,
+  )
+  // 302 has no simple-mode equivalent, so editing such a link starts in advanced mode.
+  const [advanced, setAdvanced] = useState(props.link?.redirectStatus === 302)
   const [error, setError] = useState<string | null>(null)
 
   function reset() {
     setUrl(props.link?.url ?? '')
     setCode('')
     setDomainId(null)
-    setRedirectStatus(props.link?.redirectStatus ?? 302)
+    setRedirectStatus(props.link?.redirectStatus ?? DEFAULT_REDIRECT_STATUS)
+    setAdvanced(props.link?.redirectStatus === 302)
     setError(null)
   }
 
@@ -137,7 +149,23 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
               </Field>
             )}
             <Field>
-              <FieldLabel htmlFor="link-status">{t('linkForm.statusLabel')}</FieldLabel>
+              <div className="flex items-center justify-between gap-2">
+                <FieldLabel htmlFor="link-status">{t('linkForm.statusLabel')}</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <FieldLabel htmlFor="link-advanced" className="font-normal">
+                    {t('linkForm.advancedMode')}
+                  </FieldLabel>
+                  <Switch
+                    id="link-advanced"
+                    size="sm"
+                    checked={advanced}
+                    onCheckedChange={checked => {
+                      setAdvanced(checked)
+                      if (!checked && redirectStatus === 302) setRedirectStatus(DEFAULT_REDIRECT_STATUS)
+                    }}
+                  />
+                </div>
+              </div>
               <Select
                 value={String(redirectStatus)}
                 onValueChange={value => setRedirectStatus(Number(value) as RedirectStatus)}
@@ -146,11 +174,17 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {REDIRECT_STATUSES.map(status => (
-                    <SelectItem key={status} value={String(status)}>
-                      {t(`linkForm.redirectStatus.${status}`)}
-                    </SelectItem>
-                  ))}
+                  {advanced
+                    ? REDIRECT_STATUSES.map(status => (
+                        <SelectItem key={status} value={String(status)}>
+                          {t(`linkForm.redirectStatus.advanced.${status}`)}
+                        </SelectItem>
+                      ))
+                    : SIMPLE_REDIRECT_STATUSES.map(status => (
+                        <SelectItem key={status} value={String(status)}>
+                          {t(`linkForm.redirectStatus.simple.${status}`)}
+                        </SelectItem>
+                      ))}
                 </SelectContent>
               </Select>
               <FieldDescription>{t('linkForm.statusHelp')}</FieldDescription>

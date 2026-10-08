@@ -13,11 +13,9 @@ export type CreateLinkInput = InferRequestType<typeof createLink>['json']
 export type UpdateLinkInput = InferRequestType<typeof updateLink>['json']
 
 export const linksApi = {
-  list: (page: number, size: number) =>
-    listLinks({ query: { page: String(page), size: String(size) } }).then(res => unwrap(res)),
-  create: (input: CreateLinkInput) => createLink({ json: input }).then(res => unwrap(res)),
-  update: (id: number, patch: UpdateLinkInput) =>
-    updateLink({ param: { id: String(id) }, json: patch }).then(res => unwrap(res)),
+  list: (page: number, size: number) => listLinks({ query: { page: String(page), size: String(size) } }).then(unwrap),
+  create: (input: CreateLinkInput) => createLink({ json: input }).then(unwrap),
+  update: (id: number, patch: UpdateLinkInput) => updateLink({ param: { id: String(id) }, json: patch }).then(unwrap),
   remove: (id: number) =>
     removeLink({ param: { id: String(id) } }).then(res => {
       if (!res.ok) return unwrap(res)

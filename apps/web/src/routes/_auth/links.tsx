@@ -41,7 +41,7 @@ function RouteComponent() {
   })
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
+    <div className="mx-4 md:mx-2 flex w-full flex-col gap-6 p-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('links.title')}</CardTitle>

@@ -1,7 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,8 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
-import { domainsApi } from '@/lib/domains'
 import { useApiErrorMessage } from '@/lib/api-utils'
+import { domainsApi } from '@/lib/domains'
 import { linksApi, type Link } from '@/lib/links'
 import {
   DEFAULT_REDIRECT_STATUS,
@@ -25,6 +21,10 @@ import {
   SIMPLE_REDIRECT_STATUSES,
   type RedirectStatus,
 } from '@/lib/links-schema'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 type LinkFormDialogProps =
   | { mode: 'create'; open: boolean; onOpenChange: (open: boolean) => void; link?: undefined }
@@ -75,6 +75,11 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
     },
   })
 
+  const domainItems = domains.data?.map(d => ({ label: d.host, value: d.id })) ?? []
+  const redirectItems = advanced
+    ? REDIRECT_STATUSES.map(value => ({ label: t(`linkForm.redirectStatus.advanced.${value}`), value }))
+    : SIMPLE_REDIRECT_STATUSES.map(value => ({ label: t(`linkForm.redirectStatus.simple.${value}`), value }))
+
   return (
     <Dialog
       open={open}
@@ -117,17 +122,18 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
               <Field>
                 <FieldLabel htmlFor="link-domain">{t('linkForm.domainLabel')}</FieldLabel>
                 <Select
-                  value={selectedDomainId === null ? '' : String(selectedDomainId)}
-                  onValueChange={value => setDomainId(Number(value))}
+                  items={domainItems}
+                  value={selectedDomainId}
+                  onValueChange={value => value !== null && setDomainId(value)}
                   disabled={!domains.data?.length}
                 >
                   <SelectTrigger id="link-domain" className="w-full">
                     <SelectValue placeholder={t('linkForm.domainPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {domains.data?.map(domain => (
-                      <SelectItem key={domain.id} value={String(domain.id)}>
-                        {domain.host}
+                    {domainItems.map(item => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -167,24 +173,19 @@ export function LinkFormDialog(props: LinkFormDialogProps) {
                 </div>
               </div>
               <Select
-                value={String(redirectStatus)}
-                onValueChange={value => setRedirectStatus(Number(value) as RedirectStatus)}
+                items={redirectItems}
+                value={redirectStatus}
+                onValueChange={value => value !== null && setRedirectStatus(value as RedirectStatus)}
               >
                 <SelectTrigger id="link-status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {advanced
-                    ? REDIRECT_STATUSES.map(status => (
-                        <SelectItem key={status} value={String(status)}>
-                          {t(`linkForm.redirectStatus.advanced.${status}`)}
-                        </SelectItem>
-                      ))
-                    : SIMPLE_REDIRECT_STATUSES.map(status => (
-                        <SelectItem key={status} value={String(status)}>
-                          {t(`linkForm.redirectStatus.simple.${status}`)}
-                        </SelectItem>
-                      ))}
+                  {redirectItems.map(item => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FieldDescription>{t('linkForm.statusHelp')}</FieldDescription>

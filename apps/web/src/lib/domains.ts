@@ -10,8 +10,8 @@ export type Domain = InferResponseType<typeof listDomains, 200>[number]
 export type CreateDomainInput = InferRequestType<typeof createDomain>['json']
 
 export const domainsApi = {
-  list: () => listDomains().then(res => unwrap(res)),
-  create: (input: CreateDomainInput) => createDomain({ json: input }).then(res => unwrap(res)),
+  list: () => listDomains().then(unwrap),
+  create: (input: CreateDomainInput) => createDomain({ json: input }).then(unwrap),
   remove: (id: number) =>
     removeDomain({ param: { id: String(id) } }).then(res => {
       if (!res.ok) return unwrap(res)

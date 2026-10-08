@@ -5,7 +5,7 @@ The frontend is built with [Vite](https://vite.dev/) and [ShadCN](https://ui.sha
 
 This application has dependencies on other services:
 
-- MySQL 8+
+- MySQL 8+ (the default collation must be `utf8mb4_general_ci`)
 - Redis
 - OAuth2 IdP (e.g. Keycloak)
 
